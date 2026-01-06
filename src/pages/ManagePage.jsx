@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import Scanner from '../components/Scanner'; // Import Scanner
-import { Search, Trash2, Edit, X, Save, ScanLine } from 'lucide-react'; // Tambah ScanLine
+import Scanner from '../components/Scanner';
+import { Search, Trash2, Edit, X, Save, ScanLine, Download, Upload } from 'lucide-react';
 
 const ManagePage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
-  
-  // State untuk menampilkan/menyembunyikan Scanner
   const [showScanner, setShowScanner] = useState(false);
+  
+  // Ref untuk input file (hidden)
+  const fileInputRef = useRef(null);
 
-  // Ambil semua data saat halaman dibuka
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -27,6 +27,121 @@ const ManagePage = () => {
     if (error) console.error(error);
     else setProducts(data || []);
     setLoading(false);
+  };
+
+  // --- FUNGSI EXPORT (DOWNLOAD CSV) ---
+  const handleExport = () => {
+    if (products.length === 0) return alert("Data kosong!");
+
+    // 1. Header sesuai Gambar Excel (Format CSV)
+    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
+    
+    // 2. Map data ke baris CSV
+    const rows = products.map(item => {
+      // Bungkus text dengan kutip dua (") untuk menangani koma dalam nama barang
+      const category = `"${item.category || ''}"`;
+      const sku = `"${item.sku || ''}"`; // Pakai kutip biar aman sbg teks
+      const name = `"${item.item_name || ''}"`;
+      const brand = `"${item.brand_name || '-'}"`;
+      const variant = `"${item.variant_name || ''}"`;
+      const price = item.price || 0;
+
+      return `${category},${sku},${name},${brand},${variant},${price}`;
+    });
+
+    // 3. Gabungkan Header dan Baris
+    const csvContent = [header, ...rows].join("\n");
+
+    // 4. Download File
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Database_Produk_Toko_Acan.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- FUNGSI IMPORT (UPLOAD CSV) ---
+  const handleImportClick = () => {
+    fileInputRef.current.click(); // Memicu klik pada input file tersembunyi
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target.result;
+      await processImport(text);
+    };
+    reader.readAsText(file);
+    
+    // Reset value input file biar bisa upload file yang sama lagi kalau mau
+    e.target.value = null; 
+  };
+
+  const processImport = async (csvText) => {
+    setLoading(true);
+    try {
+      const lines = csvText.split('\n');
+      const dataToInsert = [];
+
+      // Loop mulai dari index 1 (melewati Header)
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Regex canggih untuk memisahkan koma tapi MENGABAIKAN koma di dalam tanda kutip "..."
+        // Contoh: "Sabun, Cair", 123 -> akan terpisah jadi ["Sabun, Cair", "123"]
+        const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        
+        if (matches && matches.length >= 6) {
+          // Bersihkan tanda kutip " di awal dan akhir string
+          const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
+
+          const category = clean(matches[0]);
+          const sku = clean(matches[1]);
+          const item_name = clean(matches[2]);
+          const brand_name = clean(matches[3]);
+          const variant_name = clean(matches[4]);
+          const price = parseFloat(matches[5]) || 0;
+
+          // Validasi minimal: SKU dan Nama Barang harus ada
+          if (sku && item_name) {
+            dataToInsert.push({
+              category,
+              sku,
+              item_name,
+              brand_name,
+              variant_name,
+              price
+            });
+          }
+        }
+      }
+
+      if (dataToInsert.length > 0) {
+        // Upsert: Jika SKU sudah ada, update datanya. Jika belum, insert baru.
+        const { error } = await supabase
+          .from('products')
+          .upsert(dataToInsert, { onConflict: 'sku' });
+
+        if (error) throw error;
+        
+        alert(`✅ Berhasil import ${dataToInsert.length} data produk!`);
+        fetchProducts(); // Refresh tabel
+      } else {
+        alert("⚠️ File kosong atau format tidak sesuai template.");
+      }
+
+    } catch (error) {
+      alert('Gagal Import: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // --- FUNGSI HAPUS ---
@@ -64,13 +179,11 @@ const ManagePage = () => {
     }
   };
 
-  // --- FUNGSI HASIL SCAN ---
   const handleScanSearch = (sku) => {
-    setSearchQuery(sku);   // Isi kolom pencarian dengan SKU hasil scan
-    setShowScanner(false); // Tutup kamera otomatis
+    setSearchQuery(sku);
+    setShowScanner(false);
   };
 
-  // Filter pencarian
   const filteredProducts = products.filter(item => 
     item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -81,25 +194,45 @@ const ManagePage = () => {
       <div className="bg-white p-4 rounded-lg shadow-md min-h-[80vh]">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Manajemen Database</h2>
 
-        {/* --- AREA SCANNER (MUNCUL JIKA TOMBOL DITEKAN) --- */}
+        {/* --- AREA TOMBOL IMPORT / EXPORT --- */}
+        <div className="flex gap-2 mb-6">
+          <button 
+            onClick={handleExport}
+            className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"
+          >
+            <Download size={18} /> Export Excel
+          </button>
+          
+          <button 
+            onClick={handleImportClick}
+            className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"
+          >
+            <Upload size={18} /> Import Excel
+          </button>
+          {/* Input File Tersembunyi */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept=".csv" 
+            className="hidden" 
+          />
+        </div>
+
+        {/* --- AREA SCANNER --- */}
         {showScanner && (
           <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
             <p className="text-center text-sm font-bold mb-2">Scan Barcode untuk Mencari</p>
             <Scanner onScanResult={handleScanSearch} />
-            <button 
-              onClick={() => setShowScanner(false)} 
-              className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded"
-            >
+            <button onClick={() => setShowScanner(false)} className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded">
               Batal / Tutup Kamera
             </button>
           </div>
         )}
 
-        {/* --- SEARCH BAR DENGAN TOMBOL SCAN --- */}
+        {/* --- SEARCH BAR --- */}
         <div className="relative mb-4">
-          {/* Ikon Kaca Pembesar (Kiri) */}
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
-          
           <input 
             type="text"
             value={searchQuery}
@@ -107,18 +240,15 @@ const ManagePage = () => {
             placeholder="Scan atau ketik Nama/SKU..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-
-          {/* TOMBOL SCAN (KANAN) */}
           <button 
             onClick={() => setShowScanner(!showScanner)}
             className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"
-            title="Buka Scanner"
           >
             <ScanLine size={24} />
           </button>
         </div>
 
-        {/* LIST DATA */}
+        {/* --- LIST DATA --- */}
         {loading ? (
           <p className="text-center py-10">Memuat data...</p>
         ) : (
@@ -136,16 +266,10 @@ const ManagePage = () => {
                 </div>
 
                 <div className="flex gap-2 ml-2">
-                  <button 
-                    onClick={() => setEditingProduct(item)}
-                    className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"
-                  >
+                  <button onClick={() => setEditingProduct(item)} className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200">
                     <Edit size={18} />
                   </button>
-                  <button 
-                    onClick={() => handleDelete(item.id, item.item_name)}
-                    className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"
-                  >
+                  <button onClick={() => handleDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200">
                     <Trash2 size={18} />
                   </button>
                 </div>
