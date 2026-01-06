@@ -6,22 +6,20 @@ export const ExportProvider = ({ children }) => {
   const [exportList, setExportList] = useState([]);
 
   // Tambah ke list
-  const addToExportList = (product) => {
-    const productWithTime = { ...product, scan_time: new Date() };
-    setExportList(prev => [productWithTime, ...prev]);
-    alert(`"${product.item_name}" masuk ke list export!`);
+  const addToExportList = (item) => {
+    setExportList((prev) => [...prev, item]);
   };
 
-  // Hapus SEMUA
-  const clearExportList = () => setExportList([]);
-
-  // --- FUNGSI BARU: Hapus SATU Item ---
-  const removeFromExportList = (indexToRemove) => {
-    setExportList(prev => prev.filter((_, index) => index !== indexToRemove));
+  // --- TAMBAHKAN INI: Hapus dari list berdasarkan SKU ---
+  const removeFromExportList = (skuToRemove) => {
+    setExportList((prev) => prev.filter(item => item.sku !== skuToRemove));
   };
+
+  // Reset list
+  const clearList = () => setExportList([]);
 
   return (
-    <ExportContext.Provider value={{ exportList, addToExportList, clearExportList, removeFromExportList }}>
+    <ExportContext.Provider value={{ exportList, addToExportList, removeFromExportList, clearList }}>
       {children}
     </ExportContext.Provider>
   );

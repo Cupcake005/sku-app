@@ -231,7 +231,7 @@ const ManagePage = () => {
             onClick={handleImportClick}
             className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"
           >
-            <Upload size={18} /> Import Excel (Replace)
+            <Upload size={18} /> Import Excel
           </button>
           <input 
             type="file" 
