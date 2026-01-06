@@ -1,6 +1,6 @@
 import React, { useState } from 'react'; // useEffect dihapus karena tidak ada auto-name lagi
 import { supabase } from './supabaseClient';
-import Scanner from './Scanner'; // Pastikan file Scanner.jsx ada di folder src
+import Scanner from './components/Scanner';
 
 function App() {
   const [activeTab, setActiveTab] = useState('menu'); 
