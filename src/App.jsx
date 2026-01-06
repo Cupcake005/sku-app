@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ExportProvider } from './ExportContext';
 import BottomNav from './components/BottomNav';
-import ScanPage from './pages/ScanPage';
+import ScanPage from './pages/ScanPages';
 import ListPage from './pages/ListPage';
 
 function App() {
