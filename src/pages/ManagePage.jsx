@@ -33,14 +33,13 @@ const ManagePage = () => {
   const handleExport = () => {
     if (products.length === 0) return alert("Data kosong!");
 
-    // 1. Header sesuai Gambar Excel (Format CSV)
+    // Header sesuai format Excel
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
     
-    // 2. Map data ke baris CSV
     const rows = products.map(item => {
-      // Bungkus text dengan kutip dua (") untuk menangani koma dalam nama barang
+      // Bungkus text dengan kutip dua (") untuk menangani koma dalam data
       const category = `"${item.category || ''}"`;
-      const sku = `"${item.sku || ''}"`; // Pakai kutip biar aman sbg teks
+      const sku = `"${item.sku || '-'}"`; 
       const name = `"${item.item_name || ''}"`;
       const brand = `"${item.brand_name || '-'}"`;
       const variant = `"${item.variant_name || ''}"`;
@@ -49,10 +48,7 @@ const ManagePage = () => {
       return `${category},${sku},${name},${brand},${variant},${price}`;
     });
 
-    // 3. Gabungkan Header dan Baris
     const csvContent = [header, ...rows].join("\n");
-
-    // 4. Download File
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -65,7 +61,7 @@ const ManagePage = () => {
 
   // --- FUNGSI IMPORT (UPLOAD CSV) ---
   const handleImportClick = () => {
-    fileInputRef.current.click(); // Memicu klik pada input file tersembunyi
+    fileInputRef.current.click(); 
   };
 
   const handleFileChange = async (e) => {
@@ -78,42 +74,46 @@ const ManagePage = () => {
       await processImport(text);
     };
     reader.readAsText(file);
-    
-    // Reset value input file biar bisa upload file yang sama lagi kalau mau
     e.target.value = null; 
   };
 
+  // --- LOGIKA IMPORT TERBARU (DUPLIKAT BOLEH) ---
   const processImport = async (csvText) => {
     setLoading(true);
     try {
       const lines = csvText.split('\n');
       const dataToInsert = [];
 
-      // Loop mulai dari index 1 (melewati Header)
+      // Loop baris per baris (mulai index 1 untuk skip header)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Regex canggih untuk memisahkan koma tapi MENGABAIKAN koma di dalam tanda kutip "..."
-        // Contoh: "Sabun, Cair", 123 -> akan terpisah jadi ["Sabun, Cair", "123"]
+        // Regex pemisah koma cerdas (abaikan koma dalam kutip)
         const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
         
         if (matches && matches.length >= 6) {
-          // Bersihkan tanda kutip " di awal dan akhir string
           const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
 
           const category = clean(matches[0]);
-          const sku = clean(matches[1]);
+          let sku = clean(matches[1]); 
           const item_name = clean(matches[2]);
           const brand_name = clean(matches[3]);
           const variant_name = clean(matches[4]);
-          const price = parseFloat(matches[5]) || 0;
+          
+          let priceStr = clean(matches[5]).replace(/[^0-9.]/g, ''); 
+          const price = parseFloat(priceStr) || 0;
 
-          // Validasi minimal: SKU dan Nama Barang harus ada
-          if (sku && item_name) {
+          // LOGIKA 1: Handle SKU Kosong -> Jadi Strip "-"
+          if (!sku) {
+            sku = "-";
+          }
+
+          // LOGIKA 2: Validasi Minimal (Harus ada nama barang)
+          if (item_name) {
             dataToInsert.push({
               category,
-              sku,
+              sku: String(sku), // Pastikan format Text
               item_name,
               brand_name,
               variant_name,
@@ -124,17 +124,17 @@ const ManagePage = () => {
       }
 
       if (dataToInsert.length > 0) {
-        // Upsert: Jika SKU sudah ada, update datanya. Jika belum, insert baru.
+        // LOGIKA 3: Pakai .insert() agar data baru masuk semua (Duplikat OK)
         const { error } = await supabase
           .from('products')
-          .upsert(dataToInsert, { onConflict: 'sku' });
+          .insert(dataToInsert);
 
         if (error) throw error;
         
-        alert(`✅ Berhasil import ${dataToInsert.length} data produk!`);
-        fetchProducts(); // Refresh tabel
+        alert(`✅ Berhasil menambahkan ${dataToInsert.length} data produk!`);
+        fetchProducts(); 
       } else {
-        alert("⚠️ File kosong atau format tidak sesuai template.");
+        alert("⚠️ File kosong atau tidak ada data valid.");
       }
 
     } catch (error) {
@@ -179,11 +179,13 @@ const ManagePage = () => {
     }
   };
 
+  // --- SCANNER HANDLER ---
   const handleScanSearch = (sku) => {
     setSearchQuery(sku);
     setShowScanner(false);
   };
 
+  // --- FILTER PENCARIAN ---
   const filteredProducts = products.filter(item => 
     item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -194,7 +196,7 @@ const ManagePage = () => {
       <div className="bg-white p-4 rounded-lg shadow-md min-h-[80vh]">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Manajemen Database</h2>
 
-        {/* --- AREA TOMBOL IMPORT / EXPORT --- */}
+        {/* --- TOMBOL IMPORT / EXPORT --- */}
         <div className="flex gap-2 mb-6">
           <button 
             onClick={handleExport}
@@ -209,7 +211,6 @@ const ManagePage = () => {
           >
             <Upload size={18} /> Import Excel
           </button>
-          {/* Input File Tersembunyi */}
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -219,7 +220,7 @@ const ManagePage = () => {
           />
         </div>
 
-        {/* --- AREA SCANNER --- */}
+        {/* --- SCANNER --- */}
         {showScanner && (
           <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
             <p className="text-center text-sm font-bold mb-2">Scan Barcode untuk Mencari</p>
