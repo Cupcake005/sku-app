@@ -13,7 +13,7 @@ function App() {
         <div className="min-h-screen bg-gray-100 p-4 font-sans text-gray-800 max-w-md mx-auto relative">
           
           <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-blue-600">Toko Acan 📦</h1>
+            <h1 className="text-2xl font-bold text-blue-600">SKU App</h1>
           </div>
 
           <Routes>

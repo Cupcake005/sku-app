@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Search, Trash2, Edit, X, Save, AlertTriangle } from 'lucide-react';
+import Scanner from '../components/Scanner'; // Import Scanner
+import { Search, Trash2, Edit, X, Save, ScanLine } from 'lucide-react'; // Tambah ScanLine
 
 const ManagePage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingProduct, setEditingProduct] = useState(null); // Menyimpan data yang sedang diedit
+  const [editingProduct, setEditingProduct] = useState(null);
+  
+  // State untuk menampilkan/menyembunyikan Scanner
+  const [showScanner, setShowScanner] = useState(false);
 
   // Ambil semua data saat halaman dibuka
   useEffect(() => {
@@ -18,7 +22,7 @@ const ManagePage = () => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('created_at', { ascending: false }); // Urutkan dari yang terbaru
+      .order('created_at', { ascending: false });
     
     if (error) console.error(error);
     else setProducts(data || []);
@@ -32,7 +36,6 @@ const ManagePage = () => {
       if (error) {
         alert('Gagal hapus: ' + error.message);
       } else {
-        // Hapus dari state biar langsung hilang tanpa refresh
         setProducts(products.filter(item => item.id !== id));
       }
     }
@@ -56,12 +59,18 @@ const ManagePage = () => {
       alert('Gagal update: ' + error.message);
     } else {
       alert('✅ Data berhasil diperbarui!');
-      setEditingProduct(null); // Tutup modal edit
-      fetchProducts(); // Refresh data terbaru
+      setEditingProduct(null);
+      fetchProducts();
     }
   };
 
-  // Filter pencarian di sisi klien (biar cepat)
+  // --- FUNGSI HASIL SCAN ---
+  const handleScanSearch = (sku) => {
+    setSearchQuery(sku);   // Isi kolom pencarian dengan SKU hasil scan
+    setShowScanner(false); // Tutup kamera otomatis
+  };
+
+  // Filter pencarian
   const filteredProducts = products.filter(item => 
     item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -72,16 +81,41 @@ const ManagePage = () => {
       <div className="bg-white p-4 rounded-lg shadow-md min-h-[80vh]">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Manajemen Database</h2>
 
-        {/* SEARCH BAR */}
+        {/* --- AREA SCANNER (MUNCUL JIKA TOMBOL DITEKAN) --- */}
+        {showScanner && (
+          <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
+            <p className="text-center text-sm font-bold mb-2">Scan Barcode untuk Mencari</p>
+            <Scanner onScanResult={handleScanSearch} />
+            <button 
+              onClick={() => setShowScanner(false)} 
+              className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded"
+            >
+              Batal / Tutup Kamera
+            </button>
+          </div>
+        )}
+
+        {/* --- SEARCH BAR DENGAN TOMBOL SCAN --- */}
         <div className="relative mb-4">
+          {/* Ikon Kaca Pembesar (Kiri) */}
+          <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
+          
           <input 
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Nama / SKU untuk diedit..."
-            className="w-full pl-10 pr-4 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="Scan atau ketik Nama/SKU..."
+            className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
+
+          {/* TOMBOL SCAN (KANAN) */}
+          <button 
+            onClick={() => setShowScanner(!showScanner)}
+            className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"
+            title="Buka Scanner"
+          >
+            <ScanLine size={24} />
+          </button>
         </div>
 
         {/* LIST DATA */}
@@ -102,14 +136,12 @@ const ManagePage = () => {
                 </div>
 
                 <div className="flex gap-2 ml-2">
-                  {/* Tombol Edit */}
                   <button 
                     onClick={() => setEditingProduct(item)}
                     className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"
                   >
                     <Edit size={18} />
                   </button>
-                  {/* Tombol Hapus */}
                   <button 
                     onClick={() => handleDelete(item.id, item.item_name)}
                     className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"
@@ -121,13 +153,15 @@ const ManagePage = () => {
             ))}
             
             {filteredProducts.length === 0 && (
-              <p className="text-center text-gray-400 mt-10">Tidak ada data ditemukan.</p>
+              <p className="text-center text-gray-400 mt-10">
+                {searchQuery ? "Barang tidak ditemukan." : "Data kosong."}
+              </p>
             )}
           </div>
         )}
       </div>
 
-      {/* --- MODAL EDIT (MUNCUL JIKA ADA DATA YANG DIEDIT) --- */}
+      {/* --- MODAL EDIT --- */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in">
