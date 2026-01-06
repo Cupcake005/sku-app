@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import Scanner from './Scanner'; // Pastikan path ini sesuai file Scanner kamu
+import Scanner from './components/Scanner'; // Pastikan path ini sesuai file Scanner kamu
 
 function App() {
   const [activeTab, setActiveTab] = useState('menu'); 
