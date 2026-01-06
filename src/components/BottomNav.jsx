@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ScanLine, FileSpreadsheet } from 'lucide-react'; // Ikon keren
+import { ScanLine, FileSpreadsheet, Database } from 'lucide-react'; // Tambah ikon Database
 
 const BottomNav = () => {
   const navigate = useNavigate();
@@ -13,16 +13,22 @@ const BottomNav = () => {
   return (
     <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 h-16 flex justify-around items-center shadow-lg z-50">
       
-      {/* Tombol ke Halaman Scan */}
+      {/* 1. Halaman Scan */}
       <button onClick={() => navigate('/')} className={`flex flex-col items-center ${isActive('/')}`}>
         <ScanLine size={24} />
-        <span className="text-xs mt-1">Scan / Input</span>
+        <span className="text-xs mt-1">Scan</span>
       </button>
 
-      {/* Tombol ke Halaman List Export */}
+      {/* 2. Halaman List Export */}
       <button onClick={() => navigate('/list')} className={`flex flex-col items-center ${isActive('/list')}`}>
         <FileSpreadsheet size={24} />
-        <span className="text-xs mt-1">List Export</span>
+        <span className="text-xs mt-1">Export</span>
+      </button>
+
+      {/* 3. Halaman Manage Data (BARU) */}
+      <button onClick={() => navigate('/manage')} className={`flex flex-col items-center ${isActive('/manage')}`}>
+        <Database size={24} />
+        <span className="text-xs mt-1">Data</span>
       </button>
 
     </div>
