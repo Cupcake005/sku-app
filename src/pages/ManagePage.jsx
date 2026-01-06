@@ -33,11 +33,9 @@ const ManagePage = () => {
   const handleExport = () => {
     if (products.length === 0) return alert("Data kosong!");
 
-    // Header sesuai format Excel
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
     
     const rows = products.map(item => {
-      // Bungkus text dengan kutip dua (") untuk menangani koma dalam data
       const category = `"${item.category || ''}"`;
       const sku = `"${item.sku || '-'}"`; 
       const name = `"${item.item_name || ''}"`;
@@ -61,7 +59,9 @@ const ManagePage = () => {
 
   // --- FUNGSI IMPORT (UPLOAD CSV) ---
   const handleImportClick = () => {
-    fileInputRef.current.click(); 
+    if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama di aplikasi dan menggantinya dengan data dari Excel. Lanjutkan?")) {
+      fileInputRef.current.click(); 
+    }
   };
 
   const handleFileChange = async (e) => {
@@ -77,43 +77,58 @@ const ManagePage = () => {
     e.target.value = null; 
   };
 
-  // --- LOGIKA IMPORT TERBARU (DUPLIKAT BOLEH) ---
+  // --- LOGIKA IMPORT: HAPUS DULU BARU INSERT ---
   const processImport = async (csvText) => {
     setLoading(true);
     try {
       const lines = csvText.split('\n');
       const dataToInsert = [];
 
-      // Loop baris per baris (mulai index 1 untuk skip header)
+      // Fungsi Pembaca CSV Manual
+      const parseCSVLine = (text) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          if (char === '"') {
+            inQuotes = !inQuotes; 
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim()); 
+            current = '';
+          } else {
+            current += char; 
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      // Loop parsing data
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Regex pemisah koma cerdas (abaikan koma dalam kutip)
-        const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        const columns = parseCSVLine(line);
         
-        if (matches && matches.length >= 6) {
+        if (columns.length >= 6) {
           const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
 
-          const category = clean(matches[0]);
-          let sku = clean(matches[1]); 
-          const item_name = clean(matches[2]);
-          const brand_name = clean(matches[3]);
-          const variant_name = clean(matches[4]);
-          
-          let priceStr = clean(matches[5]).replace(/[^0-9.]/g, ''); 
+          const category = clean(columns[0]);
+          let sku = clean(columns[1]); 
+          const item_name = clean(columns[2]); 
+          const brand_name = clean(columns[3]);
+          const variant_name = clean(columns[4]);
+          let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
           const price = parseFloat(priceStr) || 0;
 
-          // LOGIKA 1: Handle SKU Kosong -> Jadi Strip "-"
-          if (!sku) {
-            sku = "-";
-          }
+          if (!sku) sku = "-";
 
-          // LOGIKA 2: Validasi Minimal (Harus ada nama barang)
           if (item_name) {
             dataToInsert.push({
               category,
-              sku: String(sku), // Pastikan format Text
+              sku: String(sku), 
               item_name,
               brand_name,
               variant_name,
@@ -124,17 +139,26 @@ const ManagePage = () => {
       }
 
       if (dataToInsert.length > 0) {
-        // LOGIKA 3: Pakai .insert() agar data baru masuk semua (Duplikat OK)
-        const { error } = await supabase
+        // --- LANGKAH 1: HAPUS SEMUA DATA LAMA ---
+        // Kita menghapus semua data yang kolom 'id' tidak null (artinya semua baris)
+        const { error: deleteError } = await supabase
+          .from('products')
+          .delete()
+          .not('id', 'is', null);
+
+        if (deleteError) throw deleteError;
+
+        // --- LANGKAH 2: INSERT DATA BARU ---
+        const { error: insertError } = await supabase
           .from('products')
           .insert(dataToInsert);
 
-        if (error) throw error;
+        if (insertError) throw insertError;
         
-        alert(`✅ Berhasil menambahkan ${dataToInsert.length} data produk!`);
+        alert(`✅ Sukses! Data lama dihapus. ${dataToInsert.length} data baru telah dimasukkan.`);
         fetchProducts(); 
       } else {
-        alert("⚠️ File kosong atau tidak ada data valid.");
+        alert("⚠️ File kosong atau format tidak terbaca.");
       }
 
     } catch (error) {
@@ -144,7 +168,7 @@ const ManagePage = () => {
     }
   };
 
-  // --- FUNGSI HAPUS ---
+  // --- FUNGSI HAPUS SATUAN ---
   const handleDelete = async (id, name) => {
     if (window.confirm(`Yakin mau menghapus "${name}" permanen?`)) {
       const { error } = await supabase.from('products').delete().eq('id', id);
@@ -179,13 +203,11 @@ const ManagePage = () => {
     }
   };
 
-  // --- SCANNER HANDLER ---
   const handleScanSearch = (sku) => {
     setSearchQuery(sku);
     setShowScanner(false);
   };
 
-  // --- FILTER PENCARIAN ---
   const filteredProducts = products.filter(item => 
     item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -209,7 +231,7 @@ const ManagePage = () => {
             onClick={handleImportClick}
             className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"
           >
-            <Upload size={18} /> Import Excel
+            <Upload size={18} /> Import Excel (Replace)
           </button>
           <input 
             type="file" 
