@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom'; // <--- TAMBAHAN PENTING
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner';
 import { Search, Trash2, Edit, X, Save, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
 
 const ManagePage = () => {
+  // --- 1. SETUP HOOKS URL ---
+  const [searchParams] = useSearchParams();
+  
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,7 +15,7 @@ const ManagePage = () => {
   // State untuk Edit
   const [editingProduct, setEditingProduct] = useState(null);
   
-  // State untuk Tambah Baru (SAYA TAMBAH FIELD BRAND_NAME DISINI)
+  // State untuk Tambah Baru
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProduct, setNewProduct] = useState({
     sku: '', item_name: '', category: '', brand_name: '', variant_name: '', price: ''
@@ -20,9 +24,20 @@ const ManagePage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
+  // --- 2. LOGIKA MENANGKAP SKU DARI HALAMAN SCAN ---
   useEffect(() => {
+    // Ambil data produk dari Supabase
     fetchProducts();
-  }, []);
+
+    // Cek apakah ada parameter ?sku=... di URL
+    const skuFromUrl = searchParams.get('sku');
+    if (skuFromUrl) {
+      // Isi state produk baru dengan SKU tersebut
+      setNewProduct(prev => ({ ...prev, sku: skuFromUrl }));
+      // Otomatis buka modal tambah
+      setShowAddModal(true);
+    }
+  }, [searchParams]); // Dijalankan saat URL berubah atau halaman dimuat
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -40,26 +55,18 @@ const ManagePage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- FUNGSI EXPORT (DISESUAIKAN PERSIS GAMBAR) ---
+  // --- FUNGSI EXPORT ---
   const handleExport = () => {
     if (products.length === 0) return alert("Data kosong!");
 
-    // HEADER HARUS PERSIS SEPERTI GAMBAR
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
     
     const rows = products.map(item => {
-      // Pastikan setiap field di-quote ("") agar aman saat dibuka di Excel
       const category = `"${item.category || ''}"`;
-      
-      // Trik agar SKU panjang tidak berubah jadi format ilmiah (contoh: 8.99E+12) di Excel
-      // Kita bungkus string biasa.
       const sku = `"${item.sku || ''}"`; 
-      
       const name = `"${item.item_name || ''}"`;
-      const brand = `"${item.brand_name || ''}"`; // Brand Name diambil dari database
+      const brand = `"${item.brand_name || ''}"`;
       const variant = `"${item.variant_name || ''}"`;
-      
-      // Harga kita biarkan angka murni agar bisa dijumlah di Excel, atau 0 jika kosong
       const price = item.price || 0;
 
       return `${category},${sku},${name},${brand},${variant},${price}`;
@@ -116,20 +123,18 @@ const ManagePage = () => {
         return result;
       };
 
-      // Mulai loop dari index 1 (melewati Header)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
         const columns = parseCSVLine(line);
         
-        // Pastikan kolom cukup sesuai gambar (minimal 6 kolom)
         if (columns.length >= 6) {
           const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
           
           const category = clean(columns[0]);
           let sku = clean(columns[1]); 
           const item_name = clean(columns[2]); 
-          const brand_name = clean(columns[3]); // Ambil Brand Name
+          const brand_name = clean(columns[3]);
           const variant_name = clean(columns[4]);
           
           let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
@@ -154,7 +159,6 @@ const ManagePage = () => {
         const { error: deleteError } = await supabase.from('products').delete().not('id', 'is', null);
         if (deleteError) throw deleteError;
         
-        // Insert Data (Batching jika perlu, tapi untuk <1000 items langsung array ok)
         const { error: insertError } = await supabase.from('products').insert(dataToInsert);
         if (insertError) throw insertError;
         
@@ -170,7 +174,7 @@ const ManagePage = () => {
     }
   };
 
-  // --- FUNGSI TAMBAH DATA (Updated dengan Brand Name) ---
+  // --- FUNGSI TAMBAH DATA ---
   const handleCreate = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -180,7 +184,7 @@ const ManagePage = () => {
         sku: newProduct.sku || '-',
         item_name: newProduct.item_name,
         category: newProduct.category,
-        brand_name: newProduct.brand_name || '-', // Simpan Brand
+        brand_name: newProduct.brand_name || '-',
         variant_name: newProduct.variant_name,
         price: parseFloat(newProduct.price) || 0
       }]);
@@ -190,13 +194,14 @@ const ManagePage = () => {
     } else {
       alert('✅ Produk berhasil ditambahkan!');
       setShowAddModal(false);
+      // Reset form
       setNewProduct({ sku: '', item_name: '', category: '', brand_name: '', variant_name: '', price: '' });
       fetchProducts();
     }
     setLoading(false);
   };
 
-  // --- FUNGSI UPDATE (Updated dengan Brand Name) ---
+  // --- FUNGSI UPDATE ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     const { error } = await supabase
@@ -205,7 +210,7 @@ const ManagePage = () => {
         sku: editingProduct.sku,
         item_name: editingProduct.item_name,
         category: editingProduct.category,
-        brand_name: editingProduct.brand_name, // Update Brand
+        brand_name: editingProduct.brand_name,
         variant_name: editingProduct.variant_name,
         price: parseFloat(editingProduct.price)
       })
@@ -227,9 +232,11 @@ const ManagePage = () => {
     }
   };
 
+  // --- LOGIKA SCANNER DI HALAMAN MANAGE (UNTUK SEARCH) ---
   const handleScanSearch = (sku) => {
     setSearchQuery(sku);
     setShowScanner(false);
+    alert(`🔍 Mencari SKU: ${sku}`);
   };
 
   const filteredProducts = products.filter(item => 
@@ -280,10 +287,10 @@ const ManagePage = () => {
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
         </div>
 
-        {/* --- SCANNER --- */}
+        {/* --- SCANNER UNTUK PENCARIAN --- */}
         {showScanner && (
           <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
-            <p className="text-center text-sm font-bold mb-2">Scan Barcode</p>
+            <p className="text-center text-sm font-bold mb-2">Scan Barcode untuk Mencari</p>
             <Scanner onScanResult={handleScanSearch} />
             <button onClick={() => setShowScanner(false)} className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded">
               Tutup Kamera
@@ -326,9 +333,8 @@ const ManagePage = () => {
                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
                     <span className="bg-gray-200 px-1.5 py-0.5 rounded text-[10px]">SKU: {item.sku}</span>
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
-                    {/* Tampilkan Brand juga di list supaya mudah dicek */}
                     {item.brand_name && item.brand_name !== '-' && (
-                         <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>
+                        <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>
                     )}
                     {item.variant_name && (
                        <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">
@@ -396,19 +402,18 @@ const ManagePage = () => {
               </div>
               <div className="flex gap-2">
                 <div className="w-1/2">
-                   <label className="text-xs font-bold text-gray-500">Kategori</label>
-                   <input required className="w-full border p-2 rounded" 
-                     value={editingProduct.category}
-                     onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
-                   />
+                    <label className="text-xs font-bold text-gray-500">Kategori</label>
+                    <input required className="w-full border p-2 rounded" 
+                      value={editingProduct.category}
+                      onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
+                    />
                 </div>
-                {/* Tambahan Kolom Brand di Edit */}
                 <div className="w-1/2">
-                   <label className="text-xs font-bold text-gray-500">Brand Name</label>
-                   <input className="w-full border p-2 rounded" 
-                     value={editingProduct.brand_name}
-                     onChange={(e) => setEditingProduct({...editingProduct, brand_name: e.target.value})}
-                   />
+                    <label className="text-xs font-bold text-gray-500">Brand Name</label>
+                    <input className="w-full border p-2 rounded" 
+                      value={editingProduct.brand_name}
+                      onChange={(e) => setEditingProduct({...editingProduct, brand_name: e.target.value})}
+                    />
                 </div>
               </div>
               <div>
@@ -434,7 +439,7 @@ const ManagePage = () => {
         </div>
       )}
 
-      {/* --- MODAL TAMBAH BARU --- */}
+      {/* --- MODAL TAMBAH BARU (OTOMATIS MUNCUL JIKA ADA ?SKU=...) --- */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
@@ -450,16 +455,18 @@ const ManagePage = () => {
                   value={newProduct.item_name}
                   onChange={(e) => setNewProduct({...newProduct, item_name: e.target.value})}
                   placeholder="Contoh: Lifebuoy Total 10"
+                  autoFocus // Agar kursor langsung ke nama barang
                 />
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">SKU / Barcode</label>
                 <div className="flex gap-2">
-                    <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                    <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50" 
                     value={newProduct.sku}
                     onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
                     placeholder="Scan atau ketik manual"
                     />
+                    {/* Tombol scan di dalam modal untuk scan manual tanpa tutup modal */}
                     <button type="button" onClick={() => { setShowAddModal(false); setShowScanner(true); }} className="bg-gray-200 p-2 rounded">
                         <ScanLine size={18} />
                     </button>
@@ -471,10 +478,9 @@ const ManagePage = () => {
                    <input required className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
                      value={newProduct.category}
                      onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-                     placeholder="Unilever Indonesia"
+                     placeholder="Unilever"
                    />
                 </div>
-                {/* Tambahan Kolom Brand di Tambah Manual */}
                 <div className="w-1/2">
                    <label className="text-xs font-bold text-gray-500">Brand Name</label>
                    <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
