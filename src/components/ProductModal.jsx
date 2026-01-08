@@ -39,10 +39,11 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
     }
   }, [isOpen, product]);
 
-  // Handle Perubahan Input
+  // Handle Perubahan Input (AUTO UPPERCASE)
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    // Ubah value menjadi huruf besar seketika
+    setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
   };
 
   // Handle Submit
@@ -69,34 +70,34 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
         
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Nama Barang */}
+          
+          {/* Nama Barang (Wajib) */}
           <div>
             <label className="text-xs font-bold text-gray-500">
-              Nama Barang {isEditMode ? '' : <span className="text-red-500">*</span>}
+              Nama Barang <span className="text-red-500">*</span>
             </label>
             <input 
               required 
               name="item_name"
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase" 
               value={formData.item_name}
               onChange={handleChange}
-              placeholder="Contoh: Lifebuoy Total 10"
+              placeholder="CONTOH: LIFEBUOY TOTAL 10"
               autoFocus={!isEditMode}
             />
           </div>
 
-          {/* SKU / Barcode */}
+          {/* SKU / Barcode (Opsional) */}
           <div>
             <label className="text-xs font-bold text-gray-500">SKU / Barcode</label>
             <div className={isEditMode ? "" : "flex gap-2"}>
                 <input 
                   name="sku"
-                  className={`w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none ${isEditMode ? 'bg-gray-100' : 'bg-gray-50'}`} 
+                  className={`w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase ${isEditMode ? 'bg-gray-100' : 'bg-gray-50'}`} 
                   value={formData.sku}
                   onChange={handleChange}
-                  placeholder="Scan atau ketik manual"
+                  placeholder="SCAN ATAU KETIK MANUAL"
                 />
-                {/* Tombol Scan hanya muncul di Mode Tambah (sesuai kode lama) */}
                 {!isEditMode && (
                     <button type="button" onClick={onScanClick} className="bg-gray-200 p-2 rounded">
                         <ScanLine size={18} />
@@ -105,50 +106,51 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
             </div>
           </div>
 
-          {/* Kategori & Brand */}
+          {/* Kategori & Brand (Opsional) */}
           <div className="flex gap-2">
             <div className="w-1/2">
                 <label className="text-xs font-bold text-gray-500">Kategori</label>
                 <input 
-                  required 
+                  /* TIDAK ADA REQUIRED */
                   name="category"
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase" 
                   value={formData.category}
                   onChange={handleChange}
-                  placeholder="Unilever"
+                  placeholder="UNILEVER"
                 />
             </div>
             <div className="w-1/2">
                 <label className="text-xs font-bold text-gray-500">Brand Name</label>
                 <input 
                   name="brand_name"
-                  className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase" 
                   value={formData.brand_name}
                   onChange={handleChange}
-                  placeholder="Lifebuoy"
+                  placeholder="LIFEBUOY"
                 />
             </div>
           </div>
 
-          {/* Varian */}
+          {/* Varian (Opsional) */}
           <div>
                <label className="text-xs font-bold text-gray-500">Varian</label>
                <input 
                  name="variant_name"
-                 className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                 className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase" 
                  value={formData.variant_name}
                  onChange={handleChange}
-                 placeholder="PCS / Renteng"
+                 placeholder="PCS / RENTENG"
                />
           </div>
 
-          {/* Harga */}
+          {/* Harga (Opsional - Jika kosong akan jadi 0 di database) */}
           <div>
             <label className="text-xs font-bold text-gray-500">
-              Harga Jual {isEditMode ? '' : <span className="text-red-500">*</span>}
+              Harga Jual
+              {/* Tanda bintang merah dihapus karena opsional */}
             </label>
             <input 
-              required 
+              /* TIDAK ADA REQUIRED */
               type="number" 
               name="price"
               className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
@@ -156,6 +158,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
               onChange={handleChange}
               placeholder="0"
             />
+            <p className="text-[10px] text-gray-400 mt-1">*Kosongkan jika belum ada harga</p>
           </div>
 
           {/* Tombol Simpan */}
