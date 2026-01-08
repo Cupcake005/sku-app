@@ -102,35 +102,7 @@ const Scanner = ({ onScanResult, flashOn }) => {
         muted // Wajib muted agar autoplay jalan di iOS
       />
 
-      {/* Overlay Garis Merah (UI Pemanis) */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-64 h-40 border-2 border-red-500 rounded-lg relative opacity-70">
-            {/* Garis Scan Animasi */}
-            <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-scan"></div>
-            
-            {/* Pojokan */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-l-4 border-t-4 border-red-500 -ml-1 -mt-1"></div>
-            <div className="absolute top-0 right-0 w-4 h-4 border-r-4 border-t-4 border-red-500 -mr-1 -mt-1"></div>
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-l-4 border-b-4 border-red-500 -ml-1 -mb-1"></div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-r-4 border-b-4 border-red-500 -mr-1 -mb-1"></div>
-        </div>
-        <p className="absolute mt-48 text-white text-xs font-semibold bg-black/50 px-2 py-1 rounded">
-            Arahkan kamera ke Barcode
-        </p>
-      </div>
-
-      <style>{`
-        @keyframes scan {
-            0% { top: 0; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-        .animate-scan {
-            animation: scan 2s infinite linear;
-            box-shadow: 0 0 4px red;
-        }
-      `}</style>
+      
     </div>
   );
 };
