@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner';
-import { Search, Trash2, Edit, X, Save, ScanLine, Download, Upload } from 'lucide-react';
+import { Search, Trash2, Edit, X, Save, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
 
 const ManagePage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [showScanner, setShowScanner] = useState(false);
   
-  // Ref untuk input file (hidden)
+  // State untuk Edit
+  const [editingProduct, setEditingProduct] = useState(null);
+  
+  // State untuk Tambah Baru (SAYA TAMBAH FIELD BRAND_NAME DISINI)
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    sku: '', item_name: '', category: '', brand_name: '', variant_name: '', price: ''
+  });
+
+  const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -29,18 +36,30 @@ const ManagePage = () => {
     setLoading(false);
   };
 
-  // --- FUNGSI EXPORT (DOWNLOAD CSV) ---
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // --- FUNGSI EXPORT (DISESUAIKAN PERSIS GAMBAR) ---
   const handleExport = () => {
     if (products.length === 0) return alert("Data kosong!");
 
+    // HEADER HARUS PERSIS SEPERTI GAMBAR
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
     
     const rows = products.map(item => {
+      // Pastikan setiap field di-quote ("") agar aman saat dibuka di Excel
       const category = `"${item.category || ''}"`;
-      const sku = `"${item.sku || '-'}"`; 
+      
+      // Trik agar SKU panjang tidak berubah jadi format ilmiah (contoh: 8.99E+12) di Excel
+      // Kita bungkus string biasa.
+      const sku = `"${item.sku || ''}"`; 
+      
       const name = `"${item.item_name || ''}"`;
-      const brand = `"${item.brand_name || '-'}"`;
+      const brand = `"${item.brand_name || ''}"`; // Brand Name diambil dari database
       const variant = `"${item.variant_name || ''}"`;
+      
+      // Harga kita biarkan angka murni agar bisa dijumlah di Excel, atau 0 jika kosong
       const price = item.price || 0;
 
       return `${category},${sku},${name},${brand},${variant},${price}`;
@@ -57,9 +76,9 @@ const ManagePage = () => {
     document.body.removeChild(link);
   };
 
-  // --- FUNGSI IMPORT (UPLOAD CSV) ---
+  // --- FUNGSI IMPORT ---
   const handleImportClick = () => {
-    if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama di aplikasi dan menggantinya dengan data dari Excel. Lanjutkan?")) {
+    if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama. Pastikan file CSV sesuai format gambar. Lanjutkan?")) {
       fileInputRef.current.click(); 
     }
   };
@@ -67,100 +86,83 @@ const ManagePage = () => {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      const text = evt.target.result;
-      await processImport(text);
+      await processImport(evt.target.result);
     };
     reader.readAsText(file);
     e.target.value = null; 
   };
 
-  // --- LOGIKA IMPORT: HAPUS DULU BARU INSERT ---
   const processImport = async (csvText) => {
     setLoading(true);
     try {
       const lines = csvText.split('\n');
       const dataToInsert = [];
 
-      // Fungsi Pembaca CSV Manual
       const parseCSVLine = (text) => {
         const result = [];
         let current = '';
         let inQuotes = false;
-
         for (let i = 0; i < text.length; i++) {
           const char = text[i];
-          if (char === '"') {
-            inQuotes = !inQuotes; 
-          } else if (char === ',' && !inQuotes) {
+          if (char === '"') inQuotes = !inQuotes; 
+          else if (char === ',' && !inQuotes) {
             result.push(current.trim()); 
             current = '';
-          } else {
-            current += char; 
-          }
+          } else current += char; 
         }
         result.push(current.trim());
         return result;
       };
 
-      // Loop parsing data
+      // Mulai loop dari index 1 (melewati Header)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-
         const columns = parseCSVLine(line);
         
+        // Pastikan kolom cukup sesuai gambar (minimal 6 kolom)
         if (columns.length >= 6) {
           const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
-
+          
           const category = clean(columns[0]);
           let sku = clean(columns[1]); 
           const item_name = clean(columns[2]); 
-          const brand_name = clean(columns[3]);
+          const brand_name = clean(columns[3]); // Ambil Brand Name
           const variant_name = clean(columns[4]);
+          
           let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
           const price = parseFloat(priceStr) || 0;
 
           if (!sku) sku = "-";
 
           if (item_name) {
-            dataToInsert.push({
-              category,
+            dataToInsert.push({ 
+              category, 
               sku: String(sku), 
-              item_name,
-              brand_name,
-              variant_name,
-              price
+              item_name, 
+              brand_name, 
+              variant_name, 
+              price 
             });
           }
         }
       }
 
       if (dataToInsert.length > 0) {
-        // --- LANGKAH 1: HAPUS SEMUA DATA LAMA ---
-        // Kita menghapus semua data yang kolom 'id' tidak null (artinya semua baris)
-        const { error: deleteError } = await supabase
-          .from('products')
-          .delete()
-          .not('id', 'is', null);
-
+        const { error: deleteError } = await supabase.from('products').delete().not('id', 'is', null);
         if (deleteError) throw deleteError;
-
-        // --- LANGKAH 2: INSERT DATA BARU ---
-        const { error: insertError } = await supabase
-          .from('products')
-          .insert(dataToInsert);
-
+        
+        // Insert Data (Batching jika perlu, tapi untuk <1000 items langsung array ok)
+        const { error: insertError } = await supabase.from('products').insert(dataToInsert);
         if (insertError) throw insertError;
         
-        alert(`✅ Sukses! Data lama dihapus. ${dataToInsert.length} data baru telah dimasukkan.`);
+        alert(`✅ Sukses! Format sesuai. ${dataToInsert.length} data baru dimasukkan.`);
         fetchProducts(); 
       } else {
-        alert("⚠️ File kosong atau format tidak terbaca.");
+        alert("⚠️ File kosong atau format kolom tidak sesuai.");
       }
-
     } catch (error) {
       alert('Gagal Import: ' + error.message);
     } finally {
@@ -168,19 +170,33 @@ const ManagePage = () => {
     }
   };
 
-  // --- FUNGSI HAPUS SATUAN ---
-  const handleDelete = async (id, name) => {
-    if (window.confirm(`Yakin mau menghapus "${name}" permanen?`)) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) {
-        alert('Gagal hapus: ' + error.message);
-      } else {
-        setProducts(products.filter(item => item.id !== id));
-      }
+  // --- FUNGSI TAMBAH DATA (Updated dengan Brand Name) ---
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase
+      .from('products')
+      .insert([{
+        sku: newProduct.sku || '-',
+        item_name: newProduct.item_name,
+        category: newProduct.category,
+        brand_name: newProduct.brand_name || '-', // Simpan Brand
+        variant_name: newProduct.variant_name,
+        price: parseFloat(newProduct.price) || 0
+      }]);
+
+    if (error) {
+      alert('Gagal tambah: ' + error.message);
+    } else {
+      alert('✅ Produk berhasil ditambahkan!');
+      setShowAddModal(false);
+      setNewProduct({ sku: '', item_name: '', category: '', brand_name: '', variant_name: '', price: '' });
+      fetchProducts();
     }
+    setLoading(false);
   };
 
-  // --- FUNGSI UPDATE/EDIT ---
+  // --- FUNGSI UPDATE (Updated dengan Brand Name) ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     const { error } = await supabase
@@ -189,17 +205,25 @@ const ManagePage = () => {
         sku: editingProduct.sku,
         item_name: editingProduct.item_name,
         category: editingProduct.category,
+        brand_name: editingProduct.brand_name, // Update Brand
         variant_name: editingProduct.variant_name,
         price: parseFloat(editingProduct.price)
       })
       .eq('id', editingProduct.id);
 
-    if (error) {
-      alert('Gagal update: ' + error.message);
-    } else {
-      alert('✅ Data berhasil diperbarui!');
+    if (error) alert('Gagal update: ' + error.message);
+    else {
+      alert('✅ Data diperbarui!');
       setEditingProduct(null);
       fetchProducts();
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Yakin hapus "${name}"?`)) {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) alert('Gagal hapus: ' + error.message);
+      else setProducts(products.filter(item => item.id !== id));
     }
   };
 
@@ -214,41 +238,55 @@ const ManagePage = () => {
   );
 
   return (
-    <div className="pb-24">
+    <div className="pb-24 relative">
       <div className="bg-white p-4 rounded-lg shadow-md min-h-[80vh]">
-        <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Manajemen Database</h2>
+        
+        {/* --- HEADER & TOTAL COUNT --- */}
+        <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-blue-600">Manajemen Database</h2>
+            <div className="inline-flex items-center gap-2 mt-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            <p className="text-xs font-bold text-blue-700">
+                Total Database: {products.length} Produk
+            </p>
+            </div>
+        </div>
 
-        {/* --- TOMBOL IMPORT / EXPORT --- */}
-        <div className="flex gap-2 mb-6">
-          <button 
-            onClick={handleExport}
-            className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"
-          >
-            <Download size={18} /> Export Excel
-          </button>
+        {/* --- TOMBOL AKSI --- */}
+        <div className="flex flex-col gap-2 mb-6">
+          <div className="flex gap-2">
+            <button 
+              onClick={handleExport}
+              className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"
+            >
+              <Download size={18} /> Export Excel
+            </button>
+            
+            <button 
+              onClick={handleImportClick}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"
+            >
+              <Upload size={18} /> Import Excel
+            </button>
+          </div>
           
           <button 
-            onClick={handleImportClick}
-            className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"
+            onClick={() => setShowAddModal(true)}
+            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 shadow"
           >
-            <Upload size={18} /> Import Excel
+            <Plus size={18} /> Tambah Data Manual
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept=".csv" 
-            className="hidden" 
-          />
+
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
         </div>
 
         {/* --- SCANNER --- */}
         {showScanner && (
           <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
-            <p className="text-center text-sm font-bold mb-2">Scan Barcode untuk Mencari</p>
+            <p className="text-center text-sm font-bold mb-2">Scan Barcode</p>
             <Scanner onScanResult={handleScanSearch} />
             <button onClick={() => setShowScanner(false)} className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded">
-              Batal / Tutup Kamera
+              Tutup Kamera
             </button>
           </div>
         )}
@@ -260,7 +298,7 @@ const ManagePage = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Scan atau ketik Nama/SKU..."
+            placeholder="Cari Nama atau SKU..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
           <button 
@@ -276,14 +314,30 @@ const ManagePage = () => {
           <p className="text-center py-10">Memuat data...</p>
         ) : (
           <div className="space-y-3">
+             <div className="text-xs text-gray-400 mb-2 text-right">
+                Menampilkan {filteredProducts.length} dari {products.length} data
+            </div>
+
             {filteredProducts.map((item) => (
               <div key={item.id} className="border p-3 rounded-lg shadow-sm bg-gray-50 flex justify-between items-center">
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
-                  <div className="text-xs text-gray-500">
-                    SKU: {item.sku} | {item.category}
+                  
+                  <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
+                    <span className="bg-gray-200 px-1.5 py-0.5 rounded text-[10px]">SKU: {item.sku}</span>
+                    <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
+                    {/* Tampilkan Brand juga di list supaya mudah dicek */}
+                    {item.brand_name && item.brand_name !== '-' && (
+                         <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>
+                    )}
+                    {item.variant_name && (
+                       <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">
+                         {item.variant_name}
+                       </span>
+                    )}
                   </div>
-                  <div className="text-sm font-bold text-blue-600">
+
+                  <div className="text-sm font-bold text-blue-600 mt-1">
                     Rp {item.price.toLocaleString()}
                   </div>
                 </div>
@@ -308,10 +362,18 @@ const ManagePage = () => {
         )}
       </div>
 
+      {/* --- FLOATING BUTTON (SCROLL TOP) --- */}
+      <button 
+        onClick={scrollToTop}
+        className="fixed bottom-24 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-40 transition-all hover:scale-110 active:scale-95"
+      >
+        <ArrowUp size={24} />
+      </button>
+
       {/* --- MODAL EDIT --- */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="font-bold text-lg">Edit Produk</h3>
               <button onClick={() => setEditingProduct(null)}><X size={24} /></button>
@@ -327,7 +389,7 @@ const ManagePage = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">SKU / Kode</label>
-                <input required className="w-full border p-2 rounded bg-gray-100" 
+                <input className="w-full border p-2 rounded bg-gray-100" 
                   value={editingProduct.sku}
                   onChange={(e) => setEditingProduct({...editingProduct, sku: e.target.value})}
                 />
@@ -340,13 +402,21 @@ const ManagePage = () => {
                      onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
                    />
                 </div>
+                {/* Tambahan Kolom Brand di Edit */}
                 <div className="w-1/2">
-                   <label className="text-xs font-bold text-gray-500">Varian</label>
-                   <input required className="w-full border p-2 rounded" 
-                     value={editingProduct.variant_name}
-                     onChange={(e) => setEditingProduct({...editingProduct, variant_name: e.target.value})}
+                   <label className="text-xs font-bold text-gray-500">Brand Name</label>
+                   <input className="w-full border p-2 rounded" 
+                     value={editingProduct.brand_name}
+                     onChange={(e) => setEditingProduct({...editingProduct, brand_name: e.target.value})}
                    />
                 </div>
+              </div>
+              <div>
+                 <label className="text-xs font-bold text-gray-500">Varian</label>
+                 <input className="w-full border p-2 rounded" 
+                   value={editingProduct.variant_name}
+                   onChange={(e) => setEditingProduct({...editingProduct, variant_name: e.target.value})}
+                 />
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">Harga</label>
@@ -363,6 +433,82 @@ const ManagePage = () => {
           </div>
         </div>
       )}
+
+      {/* --- MODAL TAMBAH BARU --- */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="font-bold text-lg text-indigo-600">Tambah Produk Baru</h3>
+              <button onClick={() => setShowAddModal(false)}><X size={24} /></button>
+            </div>
+            
+            <form onSubmit={handleCreate} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500">Nama Barang <span className="text-red-500">*</span></label>
+                <input required className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  value={newProduct.item_name}
+                  onChange={(e) => setNewProduct({...newProduct, item_name: e.target.value})}
+                  placeholder="Contoh: Lifebuoy Total 10"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500">SKU / Barcode</label>
+                <div className="flex gap-2">
+                    <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                    value={newProduct.sku}
+                    onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
+                    placeholder="Scan atau ketik manual"
+                    />
+                    <button type="button" onClick={() => { setShowAddModal(false); setShowScanner(true); }} className="bg-gray-200 p-2 rounded">
+                        <ScanLine size={18} />
+                    </button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-1/2">
+                   <label className="text-xs font-bold text-gray-500">Kategori</label>
+                   <input required className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                     value={newProduct.category}
+                     onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                     placeholder="Unilever Indonesia"
+                   />
+                </div>
+                {/* Tambahan Kolom Brand di Tambah Manual */}
+                <div className="w-1/2">
+                   <label className="text-xs font-bold text-gray-500">Brand Name</label>
+                   <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                     value={newProduct.brand_name}
+                     onChange={(e) => setNewProduct({...newProduct, brand_name: e.target.value})}
+                     placeholder="Lifebuoy"
+                   />
+                </div>
+              </div>
+              <div>
+                   <label className="text-xs font-bold text-gray-500">Varian</label>
+                   <input className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                     value={newProduct.variant_name}
+                     onChange={(e) => setNewProduct({...newProduct, variant_name: e.target.value})}
+                     placeholder="PCS / Renteng"
+                   />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500">Harga Jual <span className="text-red-500">*</span></label>
+                <input required type="number" className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+
+              <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg mt-4 flex justify-center gap-2 hover:bg-indigo-700">
+                <Plus size={20} /> Tambah Produk
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
