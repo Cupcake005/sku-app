@@ -4,7 +4,7 @@ import { ExportProvider } from './ExportContext';
 import BottomNav from './components/BottomNav';
 import ScanPage from './pages/ScanPage';
 import ListPage from './pages/ListPage';
-import ManagePage from './pages/ManagePage'; // <--- Import Halaman Baru
+import ManagePage from './pages/ManagePage';
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
         <div className="min-h-screen bg-gray-100 p-4 font-sans text-gray-800 max-w-md mx-auto relative">
           
           <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-blue-600">SKU MANAJAMEN</h1>
+            <h1 className="text-2xl font-bold text-blue-600">SKU MASTER V2</h1>
           </div>
 
           <Routes>
