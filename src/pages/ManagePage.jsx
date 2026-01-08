@@ -134,7 +134,7 @@ const ManagePage = () => {
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", "Database_Produk_Toko_Acan.csv");
+      link.setAttribute("download", "Database_Produk_SKU_MASTER.csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -205,7 +205,7 @@ const ManagePage = () => {
             <h2 className="text-xl font-bold text-blue-600">Manajemen Database</h2>
             <div className="inline-flex items-center gap-2 mt-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            <p className="text-xs font-bold text-blue-700">Total Database: {products.length} Produk</p>
+            <p className="text-xs font-bold text-blue-700">Total : {products.length} Produk</p>
             </div>
         </div>
 
