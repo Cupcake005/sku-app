@@ -1,32 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner'; 
+import ProductModal from '../components/ProductModal'; // Import Modal
 import { useExportList } from '../ExportContext';
-import { useNavigate } from 'react-router-dom'; // Untuk pindah halaman
-import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ShoppingCart, AlertCircle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight } from 'lucide-react';
 
-// ... (Kode Audio Beep tetap sama) ...
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
 const ScanPage = () => {
-  const { exportList, addToExportList } = useExportList(); // Kita tidak butuh removeFromExportList disini lagi
-  const navigate = useNavigate(); // Hook untuk navigasi
+  const { exportList, addToExportList } = useExportList();
+  const navigate = useNavigate();
   
-  const [mode, setMode] = useState('scan');
+  // --- STATE UI & LOGIC ---
+  const [mode, setMode] = useState('scan'); // 'scan' | 'result'
   const [loading, setLoading] = useState(false);
   const [productData, setProductData] = useState(null);
 
-  // State Kamera
-  const [isCameraActive, setIsCameraActive] = useState(true);
+  // --- STATE KAMERA DENGAN LOCAL STORAGE (INIT LAZY) ---
+  const [isCameraActive, setIsCameraActive] = useState(() => {
+    // Cek apakah user pernah mematikan kamera sebelumnya
+    const savedState = localStorage.getItem('camera_active');
+    // Jika 'false', return false. Jika null atau 'true', return true.
+    return savedState === 'false' ? false : true;
+  });
+
   const [isFlashOn, setIsFlashOn] = useState(false);
 
-  // Search State
+  // --- EFFECT: SIMPAN STATUS KAMERA KE STORAGE ---
+  useEffect(() => {
+    localStorage.setItem('camera_active', isCameraActive);
+  }, [isCameraActive]);
+
+  // --- STATE PENCARIAN ---
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // --- STATE MODAL TAMBAH PRODUK ---
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [pendingSku, setPendingSku] = useState('');
+
   const playBeep = () => { beepSound.play().catch(e => console.log(e)); };
 
+  // --- FUNGSI TAMBAH KE LIST EXPORT ---
   const handleAddItem = (product) => {
     const isDuplicate = exportList.some((item) => item.sku === product.sku);
     if (isDuplicate) {
@@ -36,24 +53,67 @@ const ScanPage = () => {
     addToExportList(product);
     setMode('scan'); 
     clearSearch();
-    // Opsional: Beri feedback visual kecil (Toast)
   };
 
-  // ... (Fungsi handleScan, handleSearch, clearSearch TETAP SAMA seperti sebelumnya) ...
+  // --- LOGIKA SCAN UTAMA ---
   const handleScan = async (sku) => {
     playBeep();
     setLoading(true);
     clearSearch(); 
     try {
+      // Cek ke Database
       const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
-      if (data) { setProductData(data); setMode('result'); } 
-      else { alert(`❌ SKU ${sku} Tidak Ditemukan`); setMode('scan'); }
-    } catch (error) { console.error(error); setMode('scan'); } 
-    finally { setLoading(false); }
+      
+      if (data) { 
+        // SKENARIO A: PRODUK ADA
+        setProductData(data); 
+        setMode('result'); 
+      } else { 
+        // SKENARIO B: PRODUK TIDAK ADA -> BUKA MODAL
+        setPendingSku(sku); // Simpan SKU yang barusan discan
+        setShowAddModal(true); // Buka Modal
+      }
+    } catch (error) { 
+      console.error(error); 
+      setMode('scan'); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  // --- LOGIKA SIMPAN PRODUK BARU DARI MODAL ---
+  const handleSaveNewProduct = async (formData) => {
+    setLoading(true);
+    // Insert ke Supabase
+    const { data, error } = await supabase
+        .from('products')
+        .insert([{
+            sku: formData.sku || '-',
+            item_name: formData.item_name,
+            category: formData.category,
+            brand_name: formData.brand_name || '-',
+            variant_name: formData.variant_name,
+            price: parseFloat(formData.price) || 0
+        }])
+        .select()
+        .single();
+
+    setLoading(false);
+
+    if (error) {
+        alert('Gagal menyimpan: ' + error.message);
+    } else {
+        alert('✅ Produk berhasil ditambahkan!');
+        setShowAddModal(false); 
+        
+        // Langsung tampilkan di mode Result agar user bisa "Masukkan ke List"
+        setProductData(data);
+        setMode('result');
+    }
   };
   
+  // --- LOGIKA SEARCH MANUAL ---
   const handleSearch = async (e) => {
-      // ... (Kode search tetap sama) ...
       e.preventDefault();
       if (!searchQuery.trim()) return;
       setLoading(true);
@@ -92,15 +152,13 @@ const ScanPage = () => {
       </div>
 
       <div className="px-4">
-        {/* --- TAMPILAN 1: SEARCH RESULTS --- */}
+        {/* --- TAMPILAN 1: SEARCH RESULTS (JIKA SEDANG MENCARI) --- */}
         {isSearching ? (
           <div>
-            {/* ... (Tampilan Search Result TETAP SAMA) ... */}
             <div className="flex justify-between items-center mb-2">
                <h3 className="font-bold text-gray-700">Hasil Pencarian ({searchResults.length})</h3>
                <button onClick={clearSearch} className="text-sm text-red-500 underline">Tutup</button>
             </div>
-            {/* Render List Search Results Disini (Copy dari kode sebelumnya) */}
              <div className="space-y-3">
                 {searchResults.map((item) => (
                   <div key={item.id} className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white">
@@ -111,18 +169,22 @@ const ScanPage = () => {
                     <button onClick={() => handleAddItem(item)} className="ml-3 bg-orange-500 text-white p-2 rounded-full"><Plus size={20} /></button>
                   </div>
                 ))}
+                {searchResults.length === 0 && (
+                    <p className="text-center text-gray-400 mt-4">Tidak ditemukan.</p>
+                )}
              </div>
           </div>
         ) : (
-          /* --- TAMPILAN 2: SCANNER --- */
+          /* --- TAMPILAN 2: SCANNER & RESULT --- */
           <>
+            {/* MODE SCAN */}
             {mode === 'scan' && (
               <>
-                <div className="relative bg-black rounded-lg overflow-hidden min-h-[250px] flex items-center justify-center shadow-lg">
+                <div className="relative bg-black rounded-lg overflow-hidden min-h-[250px] flex items-center justify-center shadow-lg transition-all">
                     {isCameraActive ? (
                         <Scanner onScanResult={handleScan} flashOn={isFlashOn} />
                     ) : (
-                        <div className="text-white flex flex-col items-center opacity-70">
+                        <div className="text-white flex flex-col items-center opacity-70 animate-fade-in">
                             <CameraOff size={48} className="mb-2"/>
                             <p>Kamera Mati</p>
                         </div>
@@ -153,12 +215,15 @@ const ScanPage = () => {
               </>
             )}
 
-            {/* --- RESULT SCAN --- */}
+            {/* MODE RESULT (PRODUK DITEMUKAN/DITAMBAHKAN) */}
             {mode === 'result' && productData && (
               <div className="text-center bg-white p-6 rounded-lg shadow-lg mt-4 animate-fade-in border border-blue-100">
                 <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-4 inline-block text-sm font-bold">✓ Ditemukan</div>
                 <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">{productData.item_name}</h2>
-                <p className="text-gray-500 mb-4 text-sm">{productData.sku}</p>
+                <div className="text-gray-500 mb-4 text-xs">
+                    SKU: {productData.sku} <br/>
+                    {productData.brand_name && `Brand: ${productData.brand_name}`}
+                </div>
                 <p className="text-3xl font-bold text-blue-600 mb-6">Rp {productData.price.toLocaleString()}</p>
 
                 <div className="space-y-3">
@@ -179,11 +244,10 @@ const ScanPage = () => {
       </div>
 
       {/* --- FLOATING BOTTOM BAR (MENU EXPORT) --- */}
-      {/* Ini pengganti List Barang. Muncul di bawah agar user tahu ada berapa barang yang sudah discan */}
       {!isSearching && exportList.length > 0 && (
           <div className="fixed bottom-20 left-4 right-4 z-20">
               <button 
-                onClick={() => navigate('/list')} // Ganti URL sesuai routing kamu
+                onClick={() => navigate('/list')} 
                 className="w-full bg-blue-600 text-white p-4 rounded-xl shadow-xl flex justify-between items-center hover:bg-blue-700 transition transform hover:-translate-y-1"
               >
                   <div className="flex items-center gap-3">
@@ -199,6 +263,15 @@ const ScanPage = () => {
               </button>
           </div>
       )}
+
+      {/* --- INTEGRASI MODAL TAMBAH PRODUK --- */}
+      <ProductModal 
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        // Kita kirim object dengan SKU saja agar form terisi otomatis
+        product={{ sku: pendingSku }} 
+        onSave={handleSaveNewProduct}
+      />
 
     </div>
   );
