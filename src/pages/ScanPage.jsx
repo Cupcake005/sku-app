@@ -19,9 +19,7 @@ const ScanPage = () => {
 
   // --- STATE KAMERA DENGAN LOCAL STORAGE (INIT LAZY) ---
   const [isCameraActive, setIsCameraActive] = useState(() => {
-    // Cek apakah user pernah mematikan kamera sebelumnya
     const savedState = localStorage.getItem('camera_active');
-    // Jika 'false', return false. Jika null atau 'true', return true.
     return savedState === 'false' ? false : true;
   });
 
@@ -164,7 +162,22 @@ const ScanPage = () => {
                   <div key={item.id} className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white">
                     <div className="flex-1">
                       <div className="font-bold text-gray-800">{item.item_name}</div>
-                      <div className="text-xs text-gray-500">{item.sku}</div>
+                      <div className="text-xs text-gray-500 mb-1">{item.sku}</div>
+                      
+                      {/* --- UPDATE: MENAMPILKAN KATEGORI & VARIAN --- */}
+                      <div className="flex flex-wrap gap-1">
+                        {item.category && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">
+                                {item.category}
+                            </span>
+                        )}
+                        {item.variant_name && (
+                            <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">
+                                {item.variant_name}
+                            </span>
+                        )}
+                      </div>
+
                     </div>
                     <button onClick={() => handleAddItem(item)} className="ml-3 bg-orange-500 text-white p-2 rounded-full"><Plus size={20} /></button>
                   </div>
@@ -180,36 +193,37 @@ const ScanPage = () => {
             {/* MODE SCAN */}
             {mode === 'scan' && (
               <>
-                <div className="relative bg-black rounded-lg overflow-hidden min-h-[250px] flex items-center justify-center shadow-lg transition-all">
+                {/* Kamera lebih kecil (h-56) */}
+                <div className="relative bg-black rounded-lg overflow-hidden h-56 w-full max-w-xs mx-auto flex items-center justify-center shadow-lg transition-all">
                     {isCameraActive ? (
                         <Scanner onScanResult={handleScan} flashOn={isFlashOn} />
                     ) : (
                         <div className="text-white flex flex-col items-center opacity-70 animate-fade-in">
-                            <CameraOff size={48} className="mb-2"/>
-                            <p>Kamera Mati</p>
+                            <CameraOff size={40} className="mb-2"/>
+                            <p className="text-sm">Kamera Mati</p>
                         </div>
                     )}
                 </div>
 
                 {/* Kontrol Kamera & Flash */}
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-2 gap-3 mt-4 max-w-xs mx-auto">
                     <button 
                         onClick={() => setIsCameraActive(!isCameraActive)}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-white shadow transition ${
+                        className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${
                             isCameraActive ? 'bg-gray-800' : 'bg-green-600'
                         }`}
                     >
-                        {isCameraActive ? <><CameraOff size={20}/> Matikan</> : <><Camera size={20}/> Hidupkan</>}
+                        {isCameraActive ? <><CameraOff size={18}/> Matikan</> : <><Camera size={18}/> Hidupkan</>}
                     </button>
 
                     <button 
                         onClick={() => setIsFlashOn(!isFlashOn)}
                         disabled={!isCameraActive}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-lg font-bold shadow transition ${
+                        className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold shadow transition text-sm ${
                             !isCameraActive ? 'bg-gray-300 text-gray-400' : isFlashOn ? 'bg-yellow-400 text-black' : 'bg-white text-gray-800 border'
                         }`}
                     >
-                        {isFlashOn ? <><ZapOff size={20}/> Flash Off</> : <><Zap size={20}/> Flash On</>}
+                        {isFlashOn ? <><ZapOff size={18}/> Flash Off</> : <><Zap size={18}/> Flash On</>}
                     </button>
                 </div>
               </>
@@ -224,6 +238,13 @@ const ScanPage = () => {
                     SKU: {productData.sku} <br/>
                     {productData.brand_name && `Brand: ${productData.brand_name}`}
                 </div>
+                
+                {/* Kategori & Varian di Result */}
+                <div className="flex justify-center gap-2 mb-4">
+                    {productData.category && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">{productData.category}</span>}
+                    {productData.variant_name && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">{productData.variant_name}</span>}
+                </div>
+
                 <p className="text-3xl font-bold text-blue-600 mb-6">Rp {productData.price.toLocaleString()}</p>
 
                 <div className="space-y-3">
@@ -268,7 +289,6 @@ const ScanPage = () => {
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        // Kita kirim object dengan SKU saja agar form terisi otomatis
         product={{ sku: pendingSku }} 
         onSave={handleSaveNewProduct}
       />

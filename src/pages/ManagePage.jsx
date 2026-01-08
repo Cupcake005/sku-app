@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner';
-import ProductModal from '../components/ProductModal'; // <--- IMPORT MODAL BARU
+import ProductModal from '../components/ProductModal'; // Import Modal Baru
 import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
 
 const ManagePage = () => {
@@ -116,8 +116,8 @@ const ManagePage = () => {
     setIsModalOpen(true);
   };
 
-  // Fungsi Import Export (Tetap Sama)
-  const handleExport = () => { /* ... Logika sama ... */ 
+  // Fungsi Import Export
+  const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
       const rows = products.map(item => {
@@ -151,7 +151,7 @@ const ManagePage = () => {
     e.target.value = null; 
   };
 
-  const processImport = async (csvText) => { /* ... Logika sama ... */ 
+  const processImport = async (csvText) => { 
       setLoading(true);
       try {
         const lines = csvText.split('\n');
@@ -188,8 +188,7 @@ const ManagePage = () => {
       } catch (error) { alert('Gagal Import: ' + error.message); } finally { setLoading(false); }
   };
 
-  // Logic Scanner Search
-  const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); };
+  const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
   const filteredProducts = products.filter(item => 
@@ -217,7 +216,6 @@ const ManagePage = () => {
             <button onClick={handleImportClick} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
           </div>
           
-          {/* TOMBOL TAMBAH DATA (Trigger Modal) */}
           <button 
             onClick={handleOpenAdd}
             className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 shadow"
@@ -261,11 +259,13 @@ const ManagePage = () => {
                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
                   </div>
-                  <div className="text-sm font-bold text-blue-600 mt-1">Rp {item.price.toLocaleString()}</div>
+                  {/* --- PERBAIKAN DI SINI: GUNAKAN (item.price || 0) --- */}
+                  <div className="text-sm font-bold text-blue-600 mt-1">
+                    Rp {(item.price || 0).toLocaleString()}
+                  </div>
                 </div>
 
                 <div className="flex gap-2 ml-2">
-                  {/* TOMBOL EDIT (Trigger Modal Edit) */}
                   <button onClick={() => handleOpenEdit(item)} className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"><Edit size={18} /></button>
                   <button onClick={() => handleDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
                 </div>
@@ -278,13 +278,12 @@ const ManagePage = () => {
 
       <button onClick={scrollToTop} className="fixed bottom-24 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-40 transition-all hover:scale-110 active:scale-95"><ArrowUp size={24} /></button>
 
-      {/* --- KOMPONEN MODAL (REUSABLE UNTUK EDIT & ADD) --- */}
       <ProductModal 
         isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setSearchParams({}); }} // Clear URL saat tutup
-        product={currentProduct} // Jika null = Add, jika object = Edit
+        onClose={() => { setIsModalOpen(false); setSearchParams({}); }} 
+        product={currentProduct}
         onSave={handleSaveProduct}
-        onScanClick={() => { setIsModalOpen(false); setShowScanner(true); }} // Tutup modal, buka scanner
+        onScanClick={() => { setIsModalOpen(false); setShowScanner(true); }} 
       />
 
     </div>
