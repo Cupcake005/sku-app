@@ -7,33 +7,28 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.png', 'vite.svg'], // Pastikan nama file logo kamu benar
+      injectRegister: 'auto', // <--- INI KUNCINYA AGAR SW JALAN
+      includeAssets: ['logo.png'], // Pastikan file ini ada di folder public
       manifest: {
         name: 'SKU Master Inventory',
         short_name: 'SKU Master',
         description: 'Aplikasi Manajemen Stok dan SKU Toko',
-        theme_color: '#2563eb', // Sesuaikan dengan warna biru header aplikasi
+        theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'standalone', // Ini yang bikin dia kayak aplikasi native (tanpa address bar browser)
-        orientation: 'portrait',
+        display: 'standalone', // <--- INI WAJIB AGAR JADI APLIKASI
         scope: '/',
         start_url: '/',
+        orientation: 'portrait',
         icons: [
           {
-            src: '/logo.png', // Pastikan kamu punya file logo.png di folder public
+            src: 'logo.png', // Jangan pakai '/' di depan jika error, coba 'logo.png' saja
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/logo.png',
+            src: 'logo.png',
             sizes: '512x512',
             type: 'image/png'
-          },
-          {
-            src: '/logo.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
           }
         ]
       }
