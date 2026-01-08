@@ -1,65 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner'; 
 import { useExportList } from '../ExportContext';
-import { Search, Plus, X } from 'lucide-react'; // Import ikon tambahan
+import { Search, Plus, X, Trash2, ShoppingCart, AlertCircle } from 'lucide-react';
+
+// Audio Beep (Base64 pendek agar tidak perlu file mp3 terpisah)
+const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
 const ScanPage = () => {
-  const { addToExportList } = useExportList();
-  const [mode, setMode] = useState('scan'); // scan, result, form
+  const { exportList, addToExportList, removeFromExportList } = useExportList();
+  
+  const [mode, setMode] = useState('scan'); // Hanya: 'scan' atau 'result' (form dihapus)
   const [loading, setLoading] = useState(false);
   const [productData, setProductData] = useState(null);
 
-  // --- STATE BARU UNTUK PENCARIAN ---
+  // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false); // Penanda sedang mode cari
+  const [isSearching, setIsSearching] = useState(false);
 
-  // State Form Input Baru
-  const [formData, setFormData] = useState({
-    sku: '', category: '', variant_name: '', price: '', item_name: ''
-  });
+  // --- FUNGSI BANTUAN: MAINKAN SUARA BEEP ---
+  const playBeep = () => {
+    beepSound.play().catch(e => console.log("Audio play blocked", e));
+  };
 
-  // --- 1. FUNGSI SEARCH (BARU) ---
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    setLoading(true);
-    setIsSearching(true); // Aktifkan mode tampilan hasil cari
-    
-    try {
-      // Query Supabase: Cari di kolom SKU ATAU item_name (ilike = insensitive case)
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .or(`sku.ilike.%${searchQuery}%,item_name.ilike.%${searchQuery}%`)
-        .limit(20); // Batasi 20 hasil saja biar ringan
+  // --- LOGIKA UTAMA: TAMBAH ITEM KE LIST ---
+  const handleAddItem = (product) => {
+    const isDuplicate = exportList.some((item) => item.sku === product.sku);
 
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      alert('Error searching: ' + error.message);
-    } finally {
-      setLoading(false);
+    if (isDuplicate) {
+      alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di dalam list!`);
+      return; 
     }
+
+    addToExportList(product);
+    setMode('scan'); 
+    clearSearch();
   };
 
-  // Fungsi Reset Pencarian
-  const clearSearch = () => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setIsSearching(false);
-  };
-
-  // --- 2. LOGIKA SCANNER (LAMA - TETAP ADA) ---
+  // --- LOGIKA SCANNER ---
   const handleScan = async (sku) => {
+    // Mainkan suara BEEP saat scan berhasil terdeteksi
+    playBeep();
+
     setLoading(true);
-    // Reset pencarian manual jika ada
     clearSearch(); 
     
-    setFormData({ sku, category: '', variant_name: '', price: '', item_name: '' });
-
     try {
       const { data, error } = await supabase
         .from('products')
@@ -71,42 +57,55 @@ const ScanPage = () => {
         setProductData(data);
         setMode('result'); 
       } else {
-        setMode('form');   
+        // PERUBAHAN: Tidak lagi masuk ke Form, tapi Alert
+        alert(`❌ Produk dengan SKU ${sku} TIDAK DITEMUKAN.\nSilakan input data di menu "Manajemen Database".`);
+        setMode('scan');
       }
     } catch (error) {
-      setMode('form');
+      console.error(error);
+      setMode('scan');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 3. SIMPAN BARANG BARU (LAMA - TETAP ADA) ---
-  const handleSaveNew = async (e) => {
+  // --- FUNGSI SEARCH ---
+  const handleSearch = async (e) => {
     e.preventDefault();
+    if (!searchQuery.trim()) return;
+    
     setLoading(true);
-    const { error } = await supabase.from('products').insert([{
-      ...formData, brand_name: '-'
-    }]);
+    setIsSearching(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .or(`sku.ilike.%${searchQuery}%,item_name.ilike.%${searchQuery}%`)
+        .limit(20);
 
-    setLoading(false);
-    if (error) {
-      alert('Gagal simpan: ' + error.message);
-    } else {
-      alert('✅ Data baru tersimpan di Database!');
-      setMode('scan'); 
+      if (error) throw error;
+      setSearchResults(data || []);
+    } catch (error) {
+      alert('Error searching: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleInput = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearching(false);
+  };
 
   return (
-    <div className="pb-24"> 
-      <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+    <div className="pb-24 max-w-md mx-auto"> 
+      <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-0 z-10">
         
-        {/* HEADER & SEARCH BAR (SELALU MUNCUL) */}
-        <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Cek Stok & Scan</h2>
+        <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Scan & Cari Stok</h2>
         
-        <form onSubmit={handleSearch} className="relative mb-6">
+        <form onSubmit={handleSearch} className="relative mb-2">
           <input 
             type="text"
             value={searchQuery}
@@ -115,16 +114,16 @@ const ScanPage = () => {
             className="w-full pl-10 pr-4 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
-          
-          {/* Tombol X untuk clear search */}
           {searchQuery && (
             <button type="button" onClick={clearSearch} className="absolute right-3 top-3.5 text-gray-400">
               <X size={20} />
             </button>
           )}
         </form>
+      </div>
 
-        {/* --- TAMPILAN 1: HASIL PENCARIAN (LIST CARD) --- */}
+      <div className="px-4">
+        {/* --- TAMPILAN 1: HASIL PENCARIAN --- */}
         {isSearching ? (
           <div>
             <div className="flex justify-between items-center mb-2">
@@ -135,31 +134,23 @@ const ScanPage = () => {
             {loading && <p className="text-center py-4">Mencari...</p>}
 
             {searchResults.length === 0 && !loading ? (
-               <div className="text-center py-8 text-gray-500">
+               <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                 <AlertCircle size={40} className="mb-2 text-gray-300"/>
                  <p>Produk tidak ditemukan.</p>
-                 <button onClick={() => setMode('form')} className="mt-2 text-blue-600 underline">
-                   + Tambah Barang Baru
-                 </button>
+                 <small>Cek ejaan atau input di Menu Database.</small>
                </div>
             ) : (
               <div className="space-y-3">
                 {searchResults.map((item) => (
-                  <div key={item.id} className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-gray-50 hover:bg-blue-50 transition">
+                  <div key={item.id} className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white">
                     <div className="flex-1">
                       <div className="font-bold text-gray-800">{item.item_name}</div>
-                      <div className="text-xs text-gray-500">
-                        SKU: {item.sku} | {item.category}
-                      </div>
-                      <div className="text-sm font-bold text-blue-600">
-                        Rp {item.price.toLocaleString()}
-                      </div>
+                      <div className="text-xs text-gray-500">SKU: {item.sku}</div>
+                      <div className="text-sm font-bold text-blue-600">Rp {item.price.toLocaleString()}</div>
                     </div>
-                    
-                    {/* TOMBOL ADD TO LIST */}
                     <button 
-                      onClick={() => addToExportList(item)}
+                      onClick={() => handleAddItem(item)}
                       className="ml-3 bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-full shadow-md"
-                      title="Tambahkan ke List"
                     >
                       <Plus size={20} />
                     </button>
@@ -169,32 +160,26 @@ const ScanPage = () => {
             )}
           </div>
         ) : (
-          /* --- TAMPILAN 2: SCANNER & FORM (MUNCUL JIKA TIDAK SEARCH) --- */
+          /* --- TAMPILAN 2: SCANNER & RESULT --- */
           <>
             {mode === 'scan' && (
               <>
                 <Scanner onScanResult={handleScan} />
-                <div className="text-center mt-4 text-sm text-gray-400">- atau gunakan kolom pencarian di atas -</div>
+                <div className="text-center mt-4 text-sm text-gray-400">- Arahkan kamera ke Barcode -</div>
                 
-                <button onClick={() => setMode('form')} className="w-full mt-4 bg-gray-100 text-gray-600 py-3 rounded-lg font-medium border border-gray-300">
-                  ⌨️ Input Barang Baru Manual
-                </button>
+                {/* Tombol Input Manual SUDAH DIHAPUS sesuai request */}
               </>
             )}
 
-            {/* --- MODE RESULT (HASIL SCAN) --- */}
             {mode === 'result' && productData && (
-              <div className="text-center animate-fade-in">
+              <div className="text-center bg-white p-6 rounded-lg shadow-lg animate-fade-in">
                 <div className="bg-green-100 text-green-800 p-2 rounded mb-4 inline-block font-bold">✓ Ditemukan</div>
                 <h2 className="text-2xl font-bold">{productData.item_name}</h2>
-                <p className="text-gray-600">{productData.sku}</p>
+                <p className="text-gray-600 mb-2">{productData.sku}</p>
                 <p className="text-3xl font-bold text-blue-600 mb-6">Rp {productData.price.toLocaleString()}</p>
 
                 <button 
-                  onClick={() => {
-                    addToExportList(productData);
-                    setMode('scan');
-                  }}
+                  onClick={() => handleAddItem(productData)}
                   className="w-full bg-orange-500 text-white font-bold py-4 rounded-lg shadow-lg hover:bg-orange-600 mb-3 flex justify-center items-center gap-2"
                 >
                   <Plus size={24} /> Masukkan ke List
@@ -203,28 +188,38 @@ const ScanPage = () => {
                 <button onClick={() => setMode('scan')} className="w-full bg-gray-200 py-3 rounded-lg">Scan Lagi</button>
               </div>
             )}
-
-            {/* --- MODE FORM (INPUT BARU) --- */}
-            {mode === 'form' && (
-              <form onSubmit={handleSaveNew} className="space-y-3">
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-                  <p className="text-yellow-800 font-bold text-sm">Barang Baru / Tidak Ditemukan</p>
-                  <p className="text-xs text-yellow-600">Silakan input data produk ini ke database.</p>
-                </div>
-                
-                <input required name="sku" value={formData.sku} onChange={handleInput} placeholder="SKU / Kode Barang" className="w-full border p-2 rounded" />
-                <input required name="item_name" value={formData.item_name} onChange={handleInput} placeholder="Nama Barang" className="w-full border p-2 rounded" />
-                <input required name="category" value={formData.category} onChange={handleInput} placeholder="Kategori" className="w-full border p-2 rounded" />
-                <input required name="variant_name" value={formData.variant_name} onChange={handleInput} placeholder="Varian" className="w-full border p-2 rounded" />
-                <input required type="number" name="price" value={formData.price} onChange={handleInput} placeholder="Harga Jual" className="w-full border p-2 rounded" />
-                
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setMode('scan')} className="w-1/3 bg-gray-200 py-2 rounded">Batal</button>
-                  <button type="submit" className="w-2/3 bg-green-600 text-white py-2 rounded font-bold">Simpan Data</button>
-                </div>
-              </form>
-            )}
           </>
+        )}
+
+        {/* --- LIST BARANG (PERSISTENT) --- */}
+        {!isSearching && mode === 'scan' && (
+           <div className="mt-8">
+             <div className="flex items-center gap-2 mb-3 border-b pb-2">
+               <ShoppingCart size={20} className="text-blue-600" />
+               <h3 className="font-bold text-lg text-gray-800">List Barang ({exportList.length})</h3>
+             </div>
+             
+             {exportList.length === 0 ? (
+               <p className="text-gray-400 text-center text-sm py-4">Belum ada barang di list.</p>
+             ) : (
+               <div className="space-y-2">
+                 {exportList.map((item, index) => (
+                   <div key={`${item.sku}-${index}`} className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm border-l-4 border-blue-500">
+                     <div>
+                       <div className="font-medium text-gray-800">{item.item_name}</div>
+                       <div className="text-xs text-gray-500">Rp {item.price.toLocaleString()}</div>
+                     </div>
+                     <button 
+                       onClick={() => removeFromExportList(item.sku)} 
+                       className="text-red-500 p-2 hover:bg-red-50 rounded"
+                     >
+                       <Trash2 size={18} />
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             )}
+           </div>
         )}
       </div>
     </div>
