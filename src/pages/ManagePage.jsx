@@ -189,7 +189,7 @@ const ManagePage = () => {
   };
 
   // Logic Scanner Search
-  const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
+  const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); };
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
   const filteredProducts = products.filter(item => 
