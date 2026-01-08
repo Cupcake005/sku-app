@@ -95,41 +95,7 @@ const Scanner = ({ onScanResult, flashOn }) => {
       <div id={qrcodeRegionId} className="w-full h-full object-cover" />
 
       {/* --- UI OVERLAY (TETAP SAMA) --- */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-        <div className="w-64 h-40 border-2 border-red-500 rounded-lg relative opacity-70">
-            {/* Garis Scan Animasi */}
-            <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-scan"></div>
-            
-            {/* Hiasan Pojok */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-l-4 border-t-4 border-red-500 -ml-1 -mt-1"></div>
-            <div className="absolute top-0 right-0 w-4 h-4 border-r-4 border-t-4 border-red-500 -mr-1 -mt-1"></div>
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-l-4 border-b-4 border-red-500 -ml-1 -mb-1"></div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-r-4 border-b-4 border-red-500 -mr-1 -mb-1"></div>
-        </div>
-        <p className="absolute mt-48 text-white text-xs font-semibold bg-black/50 px-2 py-1 rounded">
-            Arahkan kamera ke Barcode
-        </p>
-      </div>
-
-      {/* CSS untuk mematikan beberapa elemen bawaan html5-qrcode yang mungkin mengganggu */}
-      <style>{`
-        #html5qr-code-full-region video {
-            object-fit: cover !important;
-            width: 100% !important;
-            height: 100% !important;
-            border-radius: 0.5rem; /* sesuaikan dengan styling parent */
-        }
-        @keyframes scan {
-            0% { top: 0; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-        .animate-scan {
-            animation: scan 2s infinite linear;
-            box-shadow: 0 0 4px red;
-        }
-      `}</style>
+    
     </div>
   );
 };
