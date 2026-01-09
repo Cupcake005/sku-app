@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import Scanner from '../components/Scanner'; 
-import ProductModal from '../components/ProductModal'; // Import Modal
+import ProductModal from '../components/ProductModal'; 
 import { useExportList } from '../ExportContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight } from 'lucide-react';
+import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight, Copy, Check } from 'lucide-react'; // <--- 1. UPDATE IMPORT
 
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
@@ -12,12 +12,10 @@ const ScanPage = () => {
   const { exportList, addToExportList } = useExportList();
   const navigate = useNavigate();
   
-  // --- STATE UI & LOGIC ---
-  const [mode, setMode] = useState('scan'); // 'scan' | 'result'
+  const [mode, setMode] = useState('scan'); 
   const [loading, setLoading] = useState(false);
   const [productData, setProductData] = useState(null);
 
-  // --- STATE KAMERA DENGAN LOCAL STORAGE (INIT LAZY) ---
   const [isCameraActive, setIsCameraActive] = useState(() => {
     const savedState = localStorage.getItem('camera_active');
     return savedState === 'false' ? false : true;
@@ -25,23 +23,30 @@ const ScanPage = () => {
 
   const [isFlashOn, setIsFlashOn] = useState(false);
 
-  // --- EFFECT: SIMPAN STATUS KAMERA KE STORAGE ---
   useEffect(() => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
 
-  // --- STATE PENCARIAN ---
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // --- STATE MODAL TAMBAH PRODUK ---
   const [showAddModal, setShowAddModal] = useState(false);
   const [pendingSku, setPendingSku] = useState('');
 
+  // --- 2. STATE COPY ---
+  const [copiedSku, setCopiedSku] = useState(null);
+
   const playBeep = () => { beepSound.play().catch(e => console.log(e)); };
 
-  // --- FUNGSI TAMBAH KE LIST EXPORT ---
+  // --- 3. FUNGSI COPY ---
+  const handleCopySku = (sku) => {
+    if (!sku || sku === '-') return; // Jangan copy kalau kosong
+    navigator.clipboard.writeText(sku);
+    setCopiedSku(sku);
+    setTimeout(() => setCopiedSku(null), 2000); // Balikin icon setelah 2 detik
+  };
+
   const handleAddItem = (product) => {
     const isDuplicate = exportList.some((item) => item.sku === product.sku);
     if (isDuplicate) {
@@ -53,23 +58,19 @@ const ScanPage = () => {
     clearSearch();
   };
 
-  // --- LOGIKA SCAN UTAMA ---
   const handleScan = async (sku) => {
     playBeep();
     setLoading(true);
     clearSearch(); 
     try {
-      // Cek ke Database
       const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
       
       if (data) { 
-        // SKENARIO A: PRODUK ADA
         setProductData(data); 
         setMode('result'); 
       } else { 
-        // SKENARIO B: PRODUK TIDAK ADA -> BUKA MODAL
-        setPendingSku(sku); // Simpan SKU yang barusan discan
-        setShowAddModal(true); // Buka Modal
+        setPendingSku(sku); 
+        setShowAddModal(true); 
       }
     } catch (error) { 
       console.error(error); 
@@ -79,10 +80,8 @@ const ScanPage = () => {
     }
   };
 
-  // --- LOGIKA SIMPAN PRODUK BARU DARI MODAL ---
   const handleSaveNewProduct = async (formData) => {
     setLoading(true);
-    // Insert ke Supabase
     const { data, error } = await supabase
         .from('products')
         .insert([{
@@ -103,14 +102,11 @@ const ScanPage = () => {
     } else {
         alert('✅ Produk berhasil ditambahkan!');
         setShowAddModal(false); 
-        
-        // Langsung tampilkan di mode Result agar user bisa "Masukkan ke List"
         setProductData(data);
         setMode('result');
     }
   };
   
-  // --- LOGIKA SEARCH MANUAL ---
   const handleSearch = async (e) => {
       e.preventDefault();
       if (!searchQuery.trim()) return;
@@ -132,7 +128,7 @@ const ScanPage = () => {
   return (
     <div className="pb-24 max-w-md mx-auto relative min-h-screen"> 
       {/* Header Search */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-0 z-10">
+      <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-0 z-40">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Scan Barang</h2>
         <form onSubmit={handleSearch} className="relative mb-2">
           <input 
@@ -150,21 +146,34 @@ const ScanPage = () => {
       </div>
 
       <div className="px-4">
-        {/* --- TAMPILAN 1: SEARCH RESULTS (JIKA SEDANG MENCARI) --- */}
         {isSearching ? (
           <div>
             <div className="flex justify-between items-center mb-2">
                <h3 className="font-bold text-gray-700">Hasil Pencarian ({searchResults.length})</h3>
-               <button onClick={clearSearch} className="text-sm text-red-500 underline">Tutup</button>
+               <button onClick={clearSearch} className="text-l text-white rounded-lg bg-red-600 px-4 py-2">Tutup</button>
             </div>
              <div className="space-y-3">
                 {searchResults.map((item) => (
                   <div key={item.id} className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white">
                     <div className="flex-1">
                       <div className="font-bold text-gray-800">{item.item_name}</div>
-                      <div className="text-xs text-gray-500 mb-1">{item.sku}</div>
                       
-                      {/* --- UPDATE: MENAMPILKAN KATEGORI & VARIAN --- */}
+                      {/* --- 4. UPDATE TAMPILAN SKU + TOMBOL COPY --- */}
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="text-xs text-gray-500">{item.sku}</div>
+                        <button 
+                            onClick={() => handleCopySku(item.sku)}
+                            className="text-gray-400 hover:text-blue-600 transition"
+                            title="Salin SKU"
+                        >
+                            {copiedSku === item.sku ? (
+                                <Check size={14} className="text-green-500" />
+                            ) : (
+                                <Copy size={14} />
+                            )}
+                        </button>
+                      </div>
+
                       <div className="flex flex-wrap gap-1">
                         {item.category && (
                             <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">
@@ -188,12 +197,10 @@ const ScanPage = () => {
              </div>
           </div>
         ) : (
-          /* --- TAMPILAN 2: SCANNER & RESULT --- */
           <>
-            {/* MODE SCAN */}
+            {/* ... (KODE SCANNER DAN RESULT TIDAK BERUBAH) ... */}
             {mode === 'scan' && (
               <>
-                {/* Kamera lebih kecil (h-56) */}
                 <div className="relative bg-black rounded-lg overflow-hidden h-56 w-full max-w-xs mx-auto flex items-center justify-center shadow-lg transition-all">
                     {isCameraActive ? (
                         <Scanner onScanResult={handleScan} flashOn={isFlashOn} />
@@ -205,7 +212,6 @@ const ScanPage = () => {
                     )}
                 </div>
 
-                {/* Kontrol Kamera & Flash */}
                 <div className="grid grid-cols-2 gap-3 mt-4 max-w-xs mx-auto">
                     <button 
                         onClick={() => setIsCameraActive(!isCameraActive)}
@@ -229,7 +235,6 @@ const ScanPage = () => {
               </>
             )}
 
-            {/* MODE RESULT (PRODUK DITEMUKAN/DITAMBAHKAN) */}
             {mode === 'result' && productData && (
               <div className="text-center bg-white p-6 rounded-lg shadow-lg mt-4 animate-fade-in border border-blue-100">
                 <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-4 inline-block text-sm font-bold">✓ Ditemukan</div>
@@ -239,7 +244,6 @@ const ScanPage = () => {
                     {productData.brand_name && `Brand: ${productData.brand_name}`}
                 </div>
                 
-                {/* Kategori & Varian di Result */}
                 <div className="flex justify-center gap-2 mb-4">
                     {productData.category && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">{productData.category}</span>}
                     {productData.variant_name && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">{productData.variant_name}</span>}
@@ -264,7 +268,6 @@ const ScanPage = () => {
         )}
       </div>
 
-      {/* --- FLOATING BOTTOM BAR (MENU EXPORT) --- */}
       {!isSearching && exportList.length > 0 && (
           <div className="fixed bottom-20 left-4 right-4 z-20">
               <button 
@@ -285,7 +288,6 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* --- INTEGRASI MODAL TAMBAH PRODUK --- */}
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}

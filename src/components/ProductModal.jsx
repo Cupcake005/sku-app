@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Pastikan path import ini benar
+import { supabase } from '../supabaseClient';
 import { X, Save, Plus, ScanLine, Copy, Loader2 } from 'lucide-react';
 
 const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
@@ -13,13 +13,15 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
     price: ''
   });
 
-  const [isChecking, setIsChecking] = useState(false); // Loading saat cek database
+  const [isChecking, setIsChecking] = useState(false);
+  const [isVariantMode, setIsVariantMode] = useState(false);
 
   // Reset/Isi Form saat modal dibuka atau product berubah
   useEffect(() => {
     if (isOpen) {
+      setIsVariantMode(false); 
+      
       if (product) {
-        // Mode Edit: Isi dengan data produk
         setFormData({
           sku: product.sku || '',
           item_name: product.item_name || '',
@@ -29,7 +31,6 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
           price: product.price || ''
         });
       } else {
-        // Mode Tambah: Reset kosong
         setFormData({
           sku: '',
           item_name: '',
@@ -42,85 +43,112 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
     }
   }, [isOpen, product]);
 
-  // Handle Perubahan Input (AUTO UPPERCASE)
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- LOGIKA 1: CEK DUPLIKAT SAAT SAVE ---
+  // --- LOGIKA UTAMA: VALIDASI GANDA ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsChecking(true);
 
-    const skuToCheck = formData.sku.trim();
-
-    // Jika SKU kosong atau "-", loloskan saja (biarkan logic backend yang handle atau anggap no-sku)
-    if (!skuToCheck || skuToCheck === '-') {
-        setIsChecking(false);
-        onSave(formData);
-        return;
-    }
+    // 1. Siapkan Data (Uppercase)
+    const finalData = {
+        sku: formData.sku.toUpperCase().trim(),
+        item_name: formData.item_name.toUpperCase().trim(),
+        category: formData.category.toUpperCase().trim(),
+        brand_name: formData.brand_name.toUpperCase().trim(),
+        variant_name: formData.variant_name.toUpperCase().trim(),
+        price: formData.price
+    };
 
     try {
-        // Cek ke database apakah SKU sudah ada
-        const { data, error } = await supabase
-            .from('products')
-            .select('id, item_name')
-            .eq('sku', skuToCheck);
-
-        if (error) throw error;
-
-        // Validasi Duplikat
-        const isDuplicate = data.length > 0;
+        // --- VALIDASI 1: CEK SKU DUPLIKAT ---
+        const skuToCheck = finalData.sku;
         
-        // Jika mode edit, pastikan yang terdeteksi bukan diri sendiri
-        // (product.id ada jika mode edit)
-        const isSelf = product && isDuplicate && data[0].id === product.id;
+        // Hanya cek SKU jika SKU diisi dan bukan tanda strip
+        if (skuToCheck && skuToCheck !== '-') {
+            const { data: skuData, error: skuError } = await supabase
+                .from('products')
+                .select('id, item_name')
+                .eq('sku', skuToCheck);
 
-        if (isDuplicate && !isSelf) {
-            alert(`⛔ GAGAL: SKU "${skuToCheck}" sudah dipakai oleh produk: \n"${data[0].item_name}"`);
-            setIsChecking(false);
-            return; // Batalkan save
+            if (skuError) throw skuError;
+
+            if (skuData.length > 0) {
+                // Logika: Apakah ini produk lain?
+                let isSkuDuplicate = true;
+
+                if (!isVariantMode && product && skuData[0].id === product.id) {
+                    // Ini produk sendiri (sedang edit), jadi bukan duplikat
+                    isSkuDuplicate = false;
+                }
+
+                if (isSkuDuplicate) {
+                    alert(`⛔ GAGAL: SKU "${skuToCheck}" sudah dipakai oleh produk:\n"${skuData[0].item_name}"`);
+                    setIsChecking(false);
+                    return; // Stop disini
+                }
+            }
         }
 
-        // Jika aman, lanjutkan save
-        onSave(formData);
+        // --- VALIDASI 2: CEK KOMBINASI NAMA + VARIAN (FITUR BARU) ---
+        // Query: Cari produk yang NAMANYA sama DAN VARIANNYA sama
+        const { data: nameData, error: nameError } = await supabase
+            .from('products')
+            .select('id')
+            .eq('item_name', finalData.item_name)
+            .eq('variant_name', finalData.variant_name);
+
+        if (nameError) throw nameError;
+
+        if (nameData.length > 0) {
+            // Logika: Apakah ini produk lain?
+            let isNameDuplicate = true;
+
+            if (!isVariantMode && product && nameData[0].id === product.id) {
+                // Ini produk sendiri (misal cuma edit harga, tapi nama & varian gak berubah), jadi aman
+                isNameDuplicate = false;
+            }
+
+            if (isNameDuplicate) {
+                alert(`⛔ GAGAL: Produk "${finalData.item_name}" dengan varian "${finalData.variant_name}" SUDAH ADA di database.`);
+                setIsChecking(false);
+                return; // Stop disini
+            }
+        }
+
+        // --- LOLOS SEMUA VALIDASI -> SIMPAN ---
+        onSave(finalData, isVariantMode);
 
     } catch (err) {
-        console.error("Error checking SKU:", err);
-        alert("Gagal memvalidasi SKU. Cek koneksi internet.");
+        console.error("Error validating:", err);
+        alert("Terjadi kesalahan saat validasi database. Cek koneksi internet.");
     } finally {
         setIsChecking(false);
     }
   };
 
-  // --- LOGIKA 2: AUTO VARIANT (A, B, C...) ---
+  // --- LOGIKA AUTO VARIANT ---
   const handleAutoVariant = async () => {
-    if (!formData.sku || formData.sku === '-') {
+    const currentSku = formData.sku.toUpperCase().trim();
+
+    if (!currentSku || currentSku === '-') {
         alert("Isi SKU utama terlebih dahulu sebelum membuat varian.");
         return;
     }
 
     setIsChecking(true);
-    const baseSku = formData.sku;
     const suffixes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; 
     let foundSku = "";
     
-    // Loop cari A-Z yang kosong
     for (let i = 0; i < suffixes.length; i++) {
-        const candidateSku = baseSku + suffixes[i];
-        
-        // Cek ketersediaan di DB
-        const { data } = await supabase
-            .from('products')
-            .select('id')
-            .eq('sku', candidateSku);
-            
-        // Jika data kosong (length 0), berarti SKU ini belum dipakai -> AMBIL
+        const candidateSku = currentSku + suffixes[i];
+        const { data } = await supabase.from('products').select('id').eq('sku', candidateSku); 
         if (data && data.length === 0) {
             foundSku = candidateSku;
-            break; // Keluar loop
+            break; 
         }
     }
 
@@ -130,11 +158,10 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
         setFormData(prev => ({
             ...prev,
             sku: foundSku,
-            variant_name: '', // Kosongkan varian biar diisi user
-            price: ''         // Kosongkan harga biar diisi user
+            variant_name: '', 
+            price: ''         
         }));
-        // Opsional: Beri notifikasi kecil
-        // alert(`Varian SKU dibuat: ${foundSku}`);
+        setIsVariantMode(true); 
     } else {
         alert("Semua varian A-Z untuk SKU ini sudah penuh!");
     }
@@ -142,7 +169,8 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
 
   if (!isOpen) return null;
 
-  const isEditMode = !!product;
+  const isEditMode = !!product && !isVariantMode; 
+  const isVariantDisplay = isVariantMode;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -150,8 +178,12 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
         
         {/* Header Modal */}
         <div className="flex justify-between items-center mb-4 border-b pb-2">
-          <h3 className={`font-bold text-lg ${isEditMode ? '' : 'text-indigo-600'}`}>
-            {isEditMode ? 'Edit Produk' : 'Tambah Produk Baru'}
+          <h3 className={`font-bold text-lg flex items-center gap-2 ${isVariantDisplay ? 'text-purple-600' : (isEditMode ? 'text-gray-800' : 'text-indigo-600')}`}>
+            {isVariantDisplay ? (
+                <> <Copy size={20}/> Tambah Varian Baru </>
+            ) : (
+                isEditMode ? 'Edit Produk' : 'Tambah Produk Baru'
+            )}
           </h3>
           <button onClick={onClose}><X size={24} /></button>
         </div>
@@ -159,7 +191,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3">
           
-          {/* Nama Barang (Wajib) */}
+          {/* Nama Barang */}
           <div>
             <label className="text-xs font-bold text-gray-500">
               Nama Barang <span className="text-red-500">*</span>
@@ -171,7 +203,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
               value={formData.item_name}
               onChange={handleChange}
               placeholder="CONTOH: LIFEBUOY TOTAL 10"
-              autoFocus={!isEditMode}
+              autoFocus={!isEditMode && !isVariantDisplay}
             />
           </div>
 
@@ -180,17 +212,17 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
             <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-500">SKU / Barcode</label>
                 
-                {/* TOMBOL BUAT VARIAN OTOMATIS */}
-                <button 
-                    type="button" 
-                    onClick={handleAutoVariant}
-                    disabled={isChecking}
-                    className="text-[10px] bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 flex items-center gap-1 transition"
-                    title="Buat varian otomatis (SKU + A/B/C)"
-                >
-                    {isChecking ? <Loader2 size={10} className="animate-spin"/> : <Copy size={10} />} 
-                    Buat Varian (+A)
-                </button>
+                {!isVariantMode && (
+                    <button 
+                        type="button" 
+                        onClick={handleAutoVariant}
+                        disabled={isChecking}
+                        className="text-[10px] bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 flex items-center gap-1 transition"
+                    >
+                        {isChecking ? <Loader2 size={10} className="animate-spin"/> : <Copy size={10} />} 
+                        Buat Varian (+A)
+                    </button>
+                )}
             </div>
 
             <div className="flex gap-2 mt-1">
@@ -201,9 +233,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
                   onChange={handleChange}
                   placeholder="SCAN ATAU KETIK MANUAL"
                 />
-                
-                {/* Tombol Scan hanya muncul di Mode Tambah */}
-                {!isEditMode && (
+                {!isEditMode && !isVariantDisplay && (
                     <button type="button" onClick={onScanClick} className="bg-gray-200 p-2 rounded hover:bg-gray-300 transition">
                         <ScanLine size={18} />
                     </button>
@@ -240,18 +270,17 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
                <label className="text-xs font-bold text-gray-500">Varian</label>
                <input 
                  name="variant_name"
-                 className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase" 
+                 className={`w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500 outline-none uppercase ${isVariantDisplay ? 'ring-2 ring-purple-300 bg-purple-50' : ''}`}
                  value={formData.variant_name}
                  onChange={handleChange}
                  placeholder="PCS / RENTENG"
+                 autoFocus={isVariantDisplay} 
                />
           </div>
 
           {/* Harga */}
           <div>
-            <label className="text-xs font-bold text-gray-500">
-              Harga Jual
-            </label>
+            <label className="text-xs font-bold text-gray-500">Harga Jual</label>
             <input 
               type="number" 
               name="price"
@@ -260,19 +289,19 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
               onChange={handleChange}
               placeholder="0"
             />
-            <p className="text-[10px] text-gray-400 mt-1">*Kosongkan jika belum ada harga</p>
           </div>
 
           {/* Tombol Simpan */}
           <button 
             type="submit" 
             disabled={isChecking}
-            className={`w-full text-white font-bold py-3 rounded-lg mt-4 flex justify-center items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${isEditMode ? 'bg-blue-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            className={`w-full text-white font-bold py-3 rounded-lg mt-4 flex justify-center items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${isVariantDisplay ? 'bg-purple-600 hover:bg-purple-700' : (isEditMode ? 'bg-blue-600' : 'bg-indigo-600')}`}
           >
             {isChecking ? (
                 <> <Loader2 size={20} className="animate-spin" /> Memvalidasi... </>
             ) : (
-                isEditMode ? <><Save size={20} /> Simpan Perubahan</> : <><Plus size={20} /> Tambah Produk</>
+                isVariantDisplay ? <><Plus size={20} /> Simpan Varian Baru</> : 
+                (isEditMode ? <><Save size={20} /> Simpan Perubahan</> : <><Plus size={20} /> Tambah Produk</>)
             )}
           </button>
         </form>

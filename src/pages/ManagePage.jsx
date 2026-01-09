@@ -23,37 +23,61 @@ const ManagePage = () => {
     fetchProducts();
     const skuFromUrl = searchParams.get('sku');
     if (skuFromUrl) {
-      // Buka modal dalam mode TAMBAH (currentProduct null), tapi kita butuh pre-fill SKU.
-      // Trik: Kita set currentProduct sebagai object sementara yg cuma punya SKU.
       setCurrentProduct({ sku: skuFromUrl }); 
       setIsModalOpen(true);
     }
   }, [searchParams]);
 
-  const fetchProducts = async () => {
+const fetchProducts = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) console.error(error);
-    else setProducts(data || []);
-    setLoading(false);
+    try {
+        let allData = [];
+        let from = 0;
+        const step = 1000; // Ambil per 1000 data
+        let more = true;
+
+        // Loop: Ambil data terus menerus sampai habis
+        while (more) {
+            const { data, error } = await supabase
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .range(from, from + step - 1); // 0-999, lalu 1000-1999, dst...
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allData = [...allData, ...data]; // Gabungkan data baru ke data lama
+                from += step;
+                
+                // Jika data yang ditarik kurang dari 1000, berarti itu kloter terakhir
+                if (data.length < step) {
+                    more = false;
+                }
+            } else {
+                more = false; // Tidak ada data lagi
+            }
+        }
+        
+        setProducts(allData);
+    } catch (error) {
+        console.error("Error fetching products:", error);
+    } finally {
+        setLoading(false);
+    }
   };
 
-  // --- FUNGSI SAVE (CREATE & UPDATE DIJADIKAN SATU) ---
-  const handleSaveProduct = async (formData) => {
+  // --- FUNGSI SAVE (CREATE, UPDATE & VARIAN DIJADIKAN SATU) ---
+  const handleSaveProduct = async (formData, isVariantMode = false) => {
     setLoading(true);
     
-    // Cek apakah ini Update (ada ID) atau Create (tidak ada ID asli)
-    // Catatan: Saat dari URL scan, currentProduct punya SKU tapi tidak punya ID, jadi dianggap Create.
-    const isUpdate = currentProduct && currentProduct.id;
+    // Update terjadi HANYA jika: Bukan mode varian, Ada produk diedit, dan Punya ID
+    const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
 
     let error;
 
     if (isUpdate) {
-      // --- UPDATE ---
+      // --- UPDATE (EDIT DATA LAMA) ---
       const { error: err } = await supabase
         .from('products')
         .update({
@@ -67,7 +91,7 @@ const ManagePage = () => {
         .eq('id', currentProduct.id);
       error = err;
     } else {
-      // --- CREATE ---
+      // --- CREATE (DATA BARU / VARIAN BARU) ---
       const { error: err } = await supabase
         .from('products')
         .insert([{
@@ -86,10 +110,14 @@ const ManagePage = () => {
     if (error) {
       alert(`Gagal ${isUpdate ? 'update' : 'tambah'}: ` + error.message);
     } else {
-      alert(`✅ Produk berhasil ${isUpdate ? 'diperbarui' : 'ditambahkan'}!`);
+      const successMsg = isVariantMode 
+        ? '✅ Varian baru berhasil dibuat!' 
+        : (isUpdate ? '✅ Produk berhasil diperbarui!' : '✅ Produk berhasil ditambahkan!');
+      
+      alert(successMsg);
+      
       setIsModalOpen(false);
       setCurrentProduct(null);
-      // Bersihkan URL jika ada
       setSearchParams({});
       fetchProducts();
     }
@@ -106,13 +134,13 @@ const ManagePage = () => {
 
   // Fungsi Buka Modal Tambah Manual
   const handleOpenAdd = () => {
-    setCurrentProduct(null); // Pastikan null agar jadi mode tambah
+    setCurrentProduct(null);
     setIsModalOpen(true);
   };
 
   // Fungsi Buka Modal Edit
   const handleOpenEdit = (item) => {
-    setCurrentProduct(item); // Isi dengan data produk
+    setCurrentProduct(item);
     setIsModalOpen(true);
   };
 
@@ -259,7 +287,6 @@ const ManagePage = () => {
                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
                   </div>
-                  {/* --- PERBAIKAN DI SINI: GUNAKAN (item.price || 0) --- */}
                   <div className="text-sm font-bold text-blue-600 mt-1">
                     Rp {(item.price || 0).toLocaleString()}
                   </div>

@@ -5,22 +5,25 @@ import BottomNav from './components/BottomNav';
 import ScanPage from './pages/ScanPage';
 import ListPage from './pages/ListPage';
 import ManagePage from './pages/ManagePage';
+import SwipeWrapper from './components/SwipeWrapper'; // <--- 1. Import ini
 
 function App() {
   return (
     <ExportProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-100 p-4 font-sans text-gray-800 max-w-md mx-auto relative">
+        {/* Container utama aplikasi */}
+        <div className="min-h-screen bg-gray-100 font-sans text-gray-800 max-w-md mx-auto relative shadow-2xl">
           
-          <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-blue-600">SKU MASTER V2</h1>
-          </div>
-
-          <Routes>
-            <Route path="/" element={<ScanPage />} />
-            <Route path="/list" element={<ListPage />} />
-            <Route path="/manage" element={<ManagePage />} /> {/* <--- Tambah Route Baru */}
-          </Routes>
+          {/* 2. Bungkus area konten dengan SwipeWrapper */}
+          <SwipeWrapper>
+            <div className="p-4 pb-24"> {/* Padding bawah agar tidak ketutup navigasi */}
+              <Routes>
+                <Route path="/" element={<ScanPage />} />
+                <Route path="/list" element={<ListPage />} />
+                <Route path="/manage" element={<ManagePage />} />
+              </Routes>
+            </div>
+          </SwipeWrapper>
 
           <BottomNav />
           
