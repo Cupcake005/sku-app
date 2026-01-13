@@ -12,28 +12,24 @@ const ListPage = () => {
     if (exportList.length === 0) return;
 
     if (window.confirm("⚠️ Yakin ingin menghapus SEMUA barang di list?")) {
-      if (typeof clearExportList === 'function') {
         clearExportList();
-      } else {
-        [...exportList].forEach(item => {
-           if (item.sku) removeFromExportList(item.sku);
-        });
-      }
     }
   };
 
-  // --- LOGIKA HAPUS SATUAN DENGAN KONFIRMASI ---
-  const handleDeleteItem = (sku, name) => {
+  // --- LOGIKA HAPUS SATUAN (PERBAIKAN DI SINI) ---
+  // Kita harus menggunakan ID (unik dari database), bukan SKU
+  const handleDeleteItem = (id, name) => {
     if (window.confirm(`Yakin ingin menghapus "${name}" dari list?`)) {
-        removeFromExportList(sku);
+        removeFromExportList(id); // Kirim ID ke Context
     }
   };
 
-  // --- LOGIKA DOWNLOAD SESUAI FORMAT EXCEL ---
+  // --- LOGIKA DOWNLOAD ---
   const handleDownload = () => {
     if (exportList.length === 0) return alert("List kosong!");
 
-    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
+    // Tambahkan header Wholesale juga agar lengkap
+    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price";
 
     const rows = exportList.map(item => {
       const category = `"${item.category || ''}"`;
@@ -42,8 +38,10 @@ const ListPage = () => {
       const brand = `"${item.brand_name || '-'}"`; 
       const variant = `"${item.variant_name || ''}"`;
       const price = item.price || 0;
+      // Jika di tabel export_items belum ada kolom wholesale, ini akan undefined (aman)
+      const wholesale = item.wholesale_price || 0; 
 
-      return `${category},${sku},${name},${brand},${variant},${price}`;
+      return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
     });
 
     const csvContent = [header, ...rows].join("\n");
@@ -101,7 +99,7 @@ const ListPage = () => {
         ) : (
           <div className="space-y-3">
             {exportList.map((item, index) => (
-              <div key={`${item.sku}-${index}`} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex justify-between items-start hover:shadow-md transition">
+              <div key={`${item.id}-${index}`} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex justify-between items-start hover:shadow-md transition">
                 
                 {/* Detail Barang */}
                 <div className="flex-1 pr-2">
@@ -122,7 +120,7 @@ const ListPage = () => {
 
                     {/* Baris 2: Brand & Varian */}
                     <div className="flex flex-wrap gap-2 mt-1">
-                        {item.brand_name && (
+                        {item.brand_name && item.brand_name !== '-' && (
                             <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 rounded border border-purple-100">
                                 {item.brand_name}
                             </span>
@@ -137,7 +135,7 @@ const ListPage = () => {
                     {/* Baris 3: Waktu Scan */}
                     <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1 border-t border-gray-100 pt-1">
                         <Clock size={10} />
-                        {item.scan_time ? new Date(item.scan_time).toLocaleString('id-ID') : '-'}
+                        {item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-'}
                     </div>
 
                   </div>
@@ -148,10 +146,9 @@ const ListPage = () => {
                   </div>
                 </div>
 
-                {/* Tombol Hapus Per Item (LOGO JADI MERAH) */}
+                {/* Tombol Hapus Per Item (PERBAIKAN: GUNAKAN ID) */}
                 <button 
-                  onClick={() => handleDeleteItem(item.sku, item.item_name)} 
-                  // SAYA UBAH DISINI: text-gray-300 JADI text-red-500
+                  onClick={() => handleDeleteItem(item.id, item.item_name)} 
                   className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition mt-1"
                 >
                   <Trash2 size={20} />

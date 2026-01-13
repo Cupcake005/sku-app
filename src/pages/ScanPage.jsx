@@ -4,17 +4,22 @@ import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal'; 
 import { useExportList } from '../ExportContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight, Copy, Check } from 'lucide-react'; // <--- 1. UPDATE IMPORT
+import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight, Copy, Check, Edit3 } from 'lucide-react';
+import { useAuth } from '../AuthProvider'; // Import Auth jika butuh bind user saat create
 
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
 const ScanPage = () => {
+  const { user } = useAuth();
   const { exportList, addToExportList } = useExportList();
   const navigate = useNavigate();
   
   const [mode, setMode] = useState('scan'); 
   const [loading, setLoading] = useState(false);
   const [productData, setProductData] = useState(null);
+  
+  // --- STATE HARGA CUSTOM (Hanya untuk transaksi ini) ---
+  const [customPrice, setCustomPrice] = useState(''); 
 
   const [isCameraActive, setIsCameraActive] = useState(() => {
     const savedState = localStorage.getItem('camera_active');
@@ -34,17 +39,35 @@ const ScanPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [pendingSku, setPendingSku] = useState('');
 
-  // --- 2. STATE COPY ---
   const [copiedSku, setCopiedSku] = useState(null);
 
   const playBeep = () => { beepSound.play().catch(e => console.log(e)); };
 
-  // --- 3. FUNGSI COPY ---
-  const handleCopySku = (sku) => {
-    if (!sku || sku === '-') return; // Jangan copy kalau kosong
-    navigator.clipboard.writeText(sku);
-    setCopiedSku(sku);
-    setTimeout(() => setCopiedSku(null), 2000); // Balikin icon setelah 2 detik
+  // --- FUNGSI COPY SKU (ROBUST FALLBACK) ---
+  const handleCopySku = async (sku) => {
+    if (!sku || sku === '-') return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(sku);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = sku;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (!successful) throw new Error('Gagal copy manual');
+      }
+      setCopiedSku(sku);
+      setTimeout(() => setCopiedSku(null), 2000);
+    } catch (err) {
+      console.error('Copy Error:', err);
+      alert('Gagal menyalin teks.');
+    }
   };
 
   const handleAddItem = (product) => {
@@ -53,7 +76,14 @@ const ScanPage = () => {
       alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
       return; 
     }
-    addToExportList(product);
+    
+    // --- MODIFIKASI: GUNAKAN HARGA DARI INPUT CUSTOM ---
+    const productToSend = {
+        ...product,
+        price: parseFloat(customPrice) || 0 
+    };
+
+    addToExportList(productToSend);
     setMode('scan'); 
     clearSearch();
   };
@@ -67,6 +97,7 @@ const ScanPage = () => {
       
       if (data) { 
         setProductData(data); 
+        setCustomPrice(data.price); // Set harga default
         setMode('result'); 
       } else { 
         setPendingSku(sku); 
@@ -80,17 +111,22 @@ const ScanPage = () => {
     }
   };
 
+  // --- QUICK ADD MODAL (Create via Scan) ---
   const handleSaveNewProduct = async (formData) => {
+    if(!user) return alert("Sesi habis");
     setLoading(true);
+    
     const { data, error } = await supabase
         .from('products')
         .insert([{
+            user_id: user.id, // Bind user
             sku: formData.sku || '-',
             item_name: formData.item_name,
             category: formData.category,
             brand_name: formData.brand_name || '-',
             variant_name: formData.variant_name,
-            price: parseFloat(formData.price) || 0
+            price: parseFloat(formData.price) || 0,
+            wholesale_price: parseFloat(formData.wholesale_price) || 0
         }])
         .select()
         .single();
@@ -100,9 +136,10 @@ const ScanPage = () => {
     if (error) {
         alert('Gagal menyimpan: ' + error.message);
     } else {
-        alert('✅ Produk berhasil ditambahkan!');
+        alert('✅ Produk berhasil ditambahkan ke Database!');
         setShowAddModal(false); 
         setProductData(data);
+        setCustomPrice(data.price); 
         setMode('result');
     }
   };
@@ -150,7 +187,7 @@ const ScanPage = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
                <h3 className="font-bold text-gray-700">Hasil Pencarian ({searchResults.length})</h3>
-               <button onClick={clearSearch} className="text-l text-white rounded-lg bg-red-600 px-4 py-2">Tutup</button>
+               <button onClick={clearSearch} className="text-l text-white rounded-lg bg-black px-4 py-2">Tutup</button>
             </div>
              <div className="space-y-3">
                 {searchResults.map((item) => (
@@ -158,47 +195,34 @@ const ScanPage = () => {
                     <div className="flex-1">
                       <div className="font-bold text-gray-800">{item.item_name}</div>
                       
-                      {/* --- 4. UPDATE TAMPILAN SKU + TOMBOL COPY --- */}
                       <div className="flex items-center gap-2 mb-1">
                         <div className="text-xs text-gray-500">{item.sku}</div>
                         <button 
                             onClick={() => handleCopySku(item.sku)}
                             className="text-gray-400 hover:text-blue-600 transition"
-                            title="Salin SKU"
                         >
-                            {copiedSku === item.sku ? (
-                                <Check size={14} className="text-green-500" />
-                            ) : (
-                                <Copy size={14} />
-                            )}
+                            {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                         </button>
                       </div>
 
                       <div className="flex flex-wrap gap-1">
-                        {item.category && (
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">
-                                {item.category}
-                            </span>
-                        )}
-                        {item.variant_name && (
-                            <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">
-                                {item.variant_name}
-                            </span>
-                        )}
+                        {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
+                        {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
                       </div>
-
                     </div>
-                    <button onClick={() => handleAddItem(item)} className="ml-3 bg-orange-500 text-white p-2 rounded-full"><Plus size={20} /></button>
+                    
+                    <button onClick={() => {
+                        // Quick add dari search list pakai harga normal default
+                        addToExportList({ ...item, price: item.price });
+                        clearSearch();
+                    }} className="ml-3 bg-orange-500 text-white p-2 rounded-full"><Plus size={20} /></button>
                   </div>
                 ))}
-                {searchResults.length === 0 && (
-                    <p className="text-center text-gray-400 mt-4">Tidak ditemukan.</p>
-                )}
+                {searchResults.length === 0 && <p className="text-center text-gray-400 mt-4">Tidak ditemukan.</p>}
              </div>
           </div>
         ) : (
           <>
-            {/* ... (KODE SCANNER DAN RESULT TIDAK BERUBAH) ... */}
             {mode === 'scan' && (
               <>
                 <div className="relative bg-black rounded-lg overflow-hidden h-56 w-full max-w-xs mx-auto flex items-center justify-center shadow-lg transition-all">
@@ -235,13 +259,21 @@ const ScanPage = () => {
               </>
             )}
 
+            {/* --- MODIFIKASI TAMPILAN RESULT --- */}
             {mode === 'result' && productData && (
-              <div className="text-center bg-white p-6 rounded-lg shadow-lg mt-4 animate-fade-in border border-blue-100">
+              <div className="text-center bg-white p-6 rounded-lg shadow-lg mt-4 animate-fade-in border border-blue-100 relative">
+                <button 
+                  onClick={() => setMode('scan')}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+
                 <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-4 inline-block text-sm font-bold">✓ Ditemukan</div>
                 <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">{productData.item_name}</h2>
                 <div className="text-gray-500 mb-4 text-xs">
                     SKU: {productData.sku} <br/>
-                    {productData.brand_name && `Brand: ${productData.brand_name}`}
+                    {productData.brand_name !== '-' && `Brand: ${productData.brand_name}`}
                 </div>
                 
                 <div className="flex justify-center gap-2 mb-4">
@@ -249,12 +281,53 @@ const ScanPage = () => {
                     {productData.variant_name && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">{productData.variant_name}</span>}
                 </div>
 
-                <p className="text-3xl font-bold text-blue-600 mb-6">Rp {productData.price.toLocaleString()}</p>
+                {/* --- PILIHAN HARGA (JIKA ADA GROSIR) --- */}
+                {productData.wholesale_price > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        <button 
+                            onClick={() => setCustomPrice(productData.price)}
+                            className={`p-2 rounded border text-xs font-bold transition ${customPrice == productData.price ? 'bg-blue-100 border-blue-500 text-blue-700 ring-1 ring-blue-500' : 'bg-gray-50 text-gray-500'}`}
+                        >
+                            Normal<br/>Rp {productData.price.toLocaleString()}
+                        </button>
+                        <button 
+                            onClick={() => setCustomPrice(productData.wholesale_price)}
+                            className={`p-2 rounded border text-xs font-bold transition ${customPrice == productData.wholesale_price ? 'bg-green-100 border-green-500 text-green-700 ring-1 ring-green-500' : 'bg-gray-50 text-gray-500'}`}
+                        >
+                            Grosir<br/>Rp {productData.wholesale_price.toLocaleString()}
+                        </button>
+                    </div>
+                )}
+
+                {/* --- INPUT HARGA CUSTOM --- */}
+                <div className="mb-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <label className="text-xs font-bold text-gray-500 block mb-1">
+                        Harga Deal (Edit jika perlu)
+                    </label>
+                    <div className="relative max-w-[200px] mx-auto">
+                        <span className="absolute left-3 top-2.5 text-gray-500 font-bold">Rp</span>
+                        <input 
+                            type="number" 
+                            className={`w-full pl-10 pr-4 py-2 text-xl font-bold border rounded focus:ring-2 outline-none text-center bg-white ${
+                                productData.wholesale_price > 0 && customPrice == productData.wholesale_price 
+                                ? 'text-green-600 border-green-300 focus:ring-green-500' 
+                                : 'text-blue-600 border-blue-300 focus:ring-blue-500'
+                            }`}
+                            value={customPrice}
+                            onChange={(e) => setCustomPrice(e.target.value)}
+                        />
+                        <Edit3 size={16} className="absolute right-3 top-3 text-gray-400" />
+                    </div>
+                </div>
 
                 <div className="space-y-3">
                     <button 
                       onClick={() => handleAddItem(productData)}
-                      className="w-full bg-orange-500 text-white font-bold py-3 rounded-lg shadow-md hover:bg-orange-600 flex justify-center items-center gap-2"
+                      className={`w-full text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg flex justify-center items-center gap-2 transition ${
+                         productData.wholesale_price > 0 && customPrice == productData.wholesale_price 
+                         ? 'bg-green-600 hover:bg-green-700' 
+                         : 'bg-orange-500 hover:bg-orange-600'
+                      }`}
                     >
                       <Plus size={20} /> Masukkan ke List
                     </button>
