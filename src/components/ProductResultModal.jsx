@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Edit, Tag, DollarSign, Layers, Package, CheckCircle } from 'lucide-react';
+import { X, Plus, Edit, Tag, DollarSign, Layers, Package } from 'lucide-react';
+
+// Helper: Bersihkan string
+const cleanStr = (str) => {
+    if (!str) return '';
+    return String(str).toLowerCase().trim().replace(/\s+/g, ' ');
+};
 
 const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProducts = [], onEditMaster }) => {
   const [priceNormal, setPriceNormal] = useState('');
@@ -8,20 +14,21 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
 
   useEffect(() => {
     if (product && isOpen) {
-      setPriceNormal(product.price);
-      setPriceWholesale(product.wholesale_price);
+      setPriceNormal(product.price || 0);
+      setPriceWholesale(product.wholesale_price || 0);
 
-      // --- LOGIC CARI VARIAN (Sama seperti sebelumnya) ---
+      // --- LOGIC CARI VARIAN ---
       if (allProducts.length > 0) {
-        const cleanName = (str) => String(str).toLowerCase().trim().replace(/\s+/g, ' ');
-        const targetName = cleanName(product.item_name);
-        const targetCategory = cleanName(product.category);
+        const targetName = cleanStr(product.item_name);
+        const targetBrand = cleanStr(product.brand_name || '');
 
         const foundVariants = allProducts.filter(p => {
             if (p.id === product.id) return false;
-            const pName = cleanName(p.item_name);
-            const pCategory = cleanName(p.category);
-            return pName === targetName && pCategory === targetCategory;
+            const pName = cleanStr(p.item_name);
+            const pBrand = cleanStr(p.brand_name || '');
+            const isNameMatch = pName === targetName;
+            const isBrandMatch = targetBrand === '' || pBrand === targetBrand; 
+            return isNameMatch && isBrandMatch;
         }).map(v => ({
             id: v.id,
             sku: v.sku,
@@ -42,8 +49,8 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
   const handleConfirm = () => {
     const modifiedProduct = {
         ...product,
-        price: parseFloat(priceNormal),           
-        wholesale_price: parseFloat(priceWholesale),
+        price: parseFloat(priceNormal) || 0,           
+        wholesale_price: parseFloat(priceWholesale) || 0,
     };
     onAddToExport(modifiedProduct);
   };
@@ -76,18 +83,33 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
 
         {/* --- FORM HARGA TRANSAKSI --- */}
         <div className="space-y-3 mb-6">
+            {/* HARGA NORMAL */}
             <div className="relative p-3 rounded-xl border border-blue-200 bg-blue-50/50">
                 <div className="flex items-center gap-1 mb-1 text-xs font-bold text-blue-700"><Tag size={12} /> HARGA NORMAL</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input type="number" placeholder='0' className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700" value={priceNormal} onChange={(e) => setPriceNormal(e.target.value)} />
+                    <input 
+                        type="number" 
+                        className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700 placeholder-blue-300"
+                        value={priceNormal === 0 ? '' : priceNormal} // <--- FIX: Kosong jika 0
+                        onChange={(e) => setPriceNormal(e.target.value)} 
+                        placeholder="0"
+                    />
                 </div>
             </div>
+
+            {/* HARGA GROSIR */}
             <div className="relative p-3 rounded-xl border border-green-200 bg-green-50/50">
                 <div className="flex items-center gap-1 mb-1 text-xs font-bold text-green-700"><DollarSign size={12} /> HARGA GROSIR</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input type="number" placeholder='0' className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700" value={priceWholesale} onChange={(e) => setPriceWholesale(e.target.value)} />
+                    <input 
+                        type="number" 
+                        className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700 placeholder-green-300"
+                        value={priceWholesale === 0 ? '' : priceWholesale} // <--- FIX: Kosong jika 0
+                        onChange={(e) => setPriceWholesale(e.target.value)} 
+                        placeholder="0"
+                    />
                 </div>
             </div>
         </div>
