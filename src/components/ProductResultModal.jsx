@@ -8,8 +8,8 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
 
   useEffect(() => {
     if (product && isOpen) {
-      setPriceNormal(product.price || 0);
-      setPriceWholesale(product.wholesale_price || 0);
+      setPriceNormal(product.price);
+      setPriceWholesale(product.wholesale_price);
 
       // --- LOGIC CARI VARIAN (Sama seperti sebelumnya) ---
       if (allProducts.length > 0) {
