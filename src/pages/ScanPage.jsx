@@ -7,8 +7,8 @@ import { useAuth } from '../AuthProvider';
 
 // KOMPONEN:
 import Scanner from '../components/Scanner'; 
-import ProductModal from '../components/ProductModal'; // Modal Tambah Baru
-import ProductResultModal from '../components/ProductResultModal'; // <--- MODAL BARU KITA
+import ProductModal from '../components/ProductModal'; // Modal Tambah Baru (Master Data)
+import ProductResultModal from '../components/ProductResultModal'; // Modal Hasil Scan (Edit Harga Transaksi)
 
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
@@ -67,20 +67,17 @@ const ScanPage = () => {
   };
 
   // --- LOGIKA ADD ITEM KE LIST (Dipanggil dari Modal Result) ---
-  const handleAddItem = (product, finalPrice) => {
+  const handleAddItem = (product) => {
     const isDuplicate = exportList.some((item) => item.sku === product.sku);
     if (isDuplicate) {
       alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
       return; 
     }
     
-    // Gabungkan produk dengan harga final yang dipilih di modal
-    const productToSend = {
-        ...product,
-        price: finalPrice 
-    };
-
-    addToExportList(productToSend);
+    // Langsung kirim product ke ExportContext
+    // (Karena object 'product' ini sudah dimodifikasi oleh Modal Result 
+    // berisi price & wholesale_price yang baru diedit user)
+    addToExportList(product);
     
     // Tutup Modal & Reset
     setProductData(null); 
@@ -95,7 +92,7 @@ const ScanPage = () => {
       const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
       
       if (data) { 
-        setProductData(data); // <--- INI AKAN MEMICU MODAL MUNCUL
+        setProductData(data); // <--- INI AKAN MEMICU MODAL RESULT MUNCUL
       } else { 
         setPendingSku(sku); 
         setShowAddModal(true); 
@@ -133,7 +130,7 @@ const ScanPage = () => {
     } else {
         alert('✅ Produk berhasil ditambahkan!');
         setShowAddModal(false); 
-        setProductData(data); // <--- INI JUGA MEMICU MODAL RESULT MUNCUL
+        setProductData(data); // <--- INI JUGA MEMICU MODAL RESULT MUNCUL SETELAH DISIMPAN
     }
   };
   
@@ -157,7 +154,7 @@ const ScanPage = () => {
 
   // Helper untuk klik item search agar tidak bentrok dengan tombol copy
   const handleItemClick = (item) => {
-      setProductData(item); // Buka Modal
+      setProductData(item); // Buka Modal Result
   };
 
   return (
@@ -189,7 +186,7 @@ const ScanPage = () => {
             </div>
              <div className="space-y-3">
                 {searchResults.map((item) => (
-                  // Klik Row untuk Buka Modal
+                  // Klik Row untuk Buka Modal Result
                   <div 
                     key={item.id} 
                     onClick={() => handleItemClick(item)} 
@@ -215,15 +212,15 @@ const ScanPage = () => {
                       </div>
                     </div>
                     
-                    {/* Tombol Quick Add (Langsung tambah tanpa modal - harga normal) */}
+                    {/* Tombol Quick Add (Langsung tambah tanpa modal - Pakai harga asli DB) */}
                     <button 
                         onClick={(e) => {
                             e.stopPropagation(); // Biar gak buka modal
-                            addToExportList({...item, price: item.price});
+                            addToExportList(item); // Langsung kirim item asli
                             clearSearch();
                         }} 
                         className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
-                        title="Quick Add (Harga Normal)"
+                        title="Quick Add (Tanpa Edit)"
                     >
                         <Plus size={20} />
                     </button>
@@ -290,7 +287,7 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* --- MODAL 1: CREATE NEW PRODUCT --- */}
+      {/* --- MODAL 1: CREATE NEW PRODUCT (Untuk Data Baru) --- */}
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
@@ -298,8 +295,8 @@ const ScanPage = () => {
         onSave={handleSaveNewProduct}
       />
 
-      {/* --- MODAL 2: RESULT & ADD TO LIST (REUSABLE) --- */}
-      {/* Cukup render ini, dia akan muncul jika productData terisi */}
+      {/* --- MODAL 2: RESULT & ADD TO LIST (Untuk Edit Harga Transaksi) --- */}
+      {/* Cukup render ini, dia akan muncul otomatis jika productData terisi */}
       <ProductResultModal 
         isOpen={!!productData} 
         onClose={() => setProductData(null)}

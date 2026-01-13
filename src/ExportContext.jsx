@@ -10,26 +10,20 @@ export const ExportProvider = ({ children }) => {
   const { user } = useAuth(); 
   const [exportList, setExportList] = useState([]);
 
-  // 1. Fetch data saat user login
   useEffect(() => {
-    if (user) {
-        fetchExportList();
-    } else {
-        setExportList([]); 
-    }
+    if (user) fetchExportList();
+    else setExportList([]); 
   }, [user]);
 
   const fetchExportList = async () => {
-    // Ambil semua kolom (*) agar brand dan varian ikut terbawa
     const { data } = await supabase
         .from('export_items')
         .select('*')
         .order('created_at', { ascending: false });
-        
     setExportList(data || []);
   };
 
-  // 2. Tambah Item (PERBAIKAN DI SINI)
+  // --- BAGIAN YANG DIUPDATE ---
   const addToExportList = async (product) => {
     if (!user) return alert("Harus login dulu!");
 
@@ -37,11 +31,14 @@ export const ExportProvider = ({ children }) => {
         user_id: user.id,
         sku: product.sku,
         item_name: product.item_name,
-        price: product.price,
         category: product.category,
-        // --- INI YANG TADI HILANG, SEKARANG DITAMBAHKAN ---
         brand_name: product.brand_name || '-', 
         variant_name: product.variant_name || '',
+        
+        // SIMPAN KEDUA HARGA
+        price: parseFloat(product.price) || 0, // Harga Normal
+        wholesale_price: parseFloat(product.wholesale_price) || 0, // Harga Grosir
+        
         qty: 1
     };
 
@@ -51,17 +48,15 @@ export const ExportProvider = ({ children }) => {
         console.error("Error adding to export:", error);
         alert("Gagal simpan: " + error.message);
     } else {
-        fetchExportList(); // Refresh list agar data baru muncul
+        fetchExportList(); 
     }
   };
 
-  // 3. Hapus Item
   const removeFromExportList = async (id) => { 
     const { error } = await supabase.from('export_items').delete().eq('id', id);
     if (!error) fetchExportList();
   };
 
-  // 4. Reset List
   const clearExportList = async () => {
     const { error } = await supabase.from('export_items').delete().neq('id', 0); 
     if (!error) setExportList([]);
