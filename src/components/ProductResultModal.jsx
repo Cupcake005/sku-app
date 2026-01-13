@@ -1,22 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Edit3 } from 'lucide-react';
+import { X, Plus, Edit3, Tag, DollarSign } from 'lucide-react';
 
 const ProductResultModal = ({ isOpen, onClose, product, onAddToExport }) => {
-  // State harga khusus untuk sesi ini (dipindah dari ScanPage ke sini)
-  const [customPrice, setCustomPrice] = useState('');
+  // State untuk menampung editan harga (hanya sesi ini)
+  const [priceNormal, setPriceNormal] = useState('');
+  const [priceWholesale, setPriceWholesale] = useState('');
+  
+  // State untuk menentukan harga mana yang dipakai sebagai "Harga Deal" (Total)
+  // 'normal' atau 'wholesale'
+  const [activeTab, setActiveTab] = useState('normal'); 
 
-  // Setiap kali produk berubah (scan baru/klik list baru), reset harga ke default
+  // Reset state saat produk berubah
   useEffect(() => {
     if (product) {
-      setCustomPrice(product.price);
+      setPriceNormal(product.price || 0);
+      setPriceWholesale(product.wholesale_price || 0);
+      
+      // Otomatis pilih grosir jika produk punya harga grosir > 0
+      if (product.wholesale_price > 0) {
+        // Opsional: Tetap default normal, atau mau otomatis grosir bisa diatur disini
+        // setActiveTab('wholesale'); 
+        setActiveTab('normal'); 
+      } else {
+        setActiveTab('normal');
+      }
     }
   }, [product]);
 
   if (!isOpen || !product) return null;
 
   const handleConfirm = () => {
-    // Kirim data balik ke parent (ScanPage) beserta harga final yang dipilih
-    onAddToExport(product, parseFloat(customPrice) || 0);
+    // 1. Siapkan object produk bayangan (Modified Product)
+    // Ini agar di tabel export nanti tersimpan angka yang baru diedit, bukan angka database
+    const modifiedProduct = {
+        ...product,
+        price: parseFloat(priceNormal) || 0,           // Timpa harga normal master
+        wholesale_price: parseFloat(priceWholesale) || 0 // Timpa harga grosir master
+    };
+
+    // 2. Tentukan harga final yang harus dibayar (Deal Price)
+    const finalDealPrice = activeTab === 'normal' 
+        ? modifiedProduct.price 
+        : modifiedProduct.wholesale_price;
+
+    // 3. Kirim ke ScanPage
+    onAddToExport(modifiedProduct, finalDealPrice);
   };
 
   return (
@@ -26,84 +54,108 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport }) => {
         {/* Tombol Close */}
         <button 
           onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full"
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full z-10"
         >
           <X size={24} />
         </button>
 
-        {/* Header Status */}
-        <div className="text-center">
-            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-4 inline-block text-sm font-bold shadow-sm">
-                ✓ Ditemukan
+        {/* Header Info Produk */}
+        <div className="text-center mb-6">
+            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-3 inline-block text-xs font-bold shadow-sm uppercase tracking-wider">
+                ✓ Produk Ditemukan
             </div>
             <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">
                 {product.item_name}
             </h2>
-            <div className="text-gray-500 mb-4 text-xs">
-                SKU: {product.sku} <br/>
-                {product.brand_name !== '-' && `Brand: ${product.brand_name}`}
-            </div>
-            
-            <div className="flex justify-center gap-2 mb-4">
-                {product.category && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">{product.category}</span>}
-                {product.variant_name && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded border border-orange-100">{product.variant_name}</span>}
+            <div className="text-gray-500 text-xs">
+                SKU: {product.sku}
+                {product.brand_name !== '-' && <span className="mx-1">•</span>}
+                {product.brand_name !== '-' && product.brand_name}
             </div>
         </div>
 
-        {/* --- PILIHAN HARGA (NORMAL VS GROSIR) --- */}
-        {product.wholesale_price > 0 && (
-            <div className="grid grid-cols-2 gap-2 mb-4">
-                <button 
-                    onClick={() => setCustomPrice(product.price)}
-                    className={`p-2 rounded-lg border text-xs font-bold transition flex flex-col items-center justify-center ${customPrice == product.price ? 'bg-blue-100 border-blue-500 text-blue-700 ring-1 ring-blue-500 shadow-inner' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                >
-                    <span>Normal</span>
-                    <span className="text-sm">Rp {product.price.toLocaleString()}</span>
-                </button>
-                <button 
-                    onClick={() => setCustomPrice(product.wholesale_price)}
-                    className={`p-2 rounded-lg border text-xs font-bold transition flex flex-col items-center justify-center ${customPrice == product.wholesale_price ? 'bg-green-100 border-green-500 text-green-700 ring-1 ring-green-500 shadow-inner' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                >
-                    <span>Grosir</span>
-                    <span className="text-sm">Rp {product.wholesale_price.toLocaleString()}</span>
-                </button>
-            </div>
-        )}
+        {/* --- EDIT 2 HARGA --- */}
+        <div className="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wide text-center">
+            Pilih & Edit Harga Transaksi
+        </div>
 
-        {/* --- INPUT HARGA FINAL --- */}
-        <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <label className="text-xs font-bold text-gray-500 block mb-1 text-center">
-                Harga Deal (Edit jika perlu)
-            </label>
-            <div className="relative max-w-[200px] mx-auto">
-                <span className="absolute left-3 top-2.5 text-gray-500 font-bold">Rp</span>
-                <input 
-                    type="number" 
-                    className={`w-full pl-10 pr-4 py-2 text-xl font-bold border rounded-lg focus:ring-2 outline-none text-center bg-white shadow-sm ${
-                        product.wholesale_price > 0 && customPrice == product.wholesale_price 
-                        ? 'text-green-600 border-green-300 focus:ring-green-500' 
-                        : 'text-blue-600 border-blue-300 focus:ring-blue-500'
-                    }`}
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(e.target.value)}
-                />
-                <Edit3 size={16} className="absolute right-3 top-3 text-gray-400" />
+        <div className="grid grid-cols-2 gap-3 mb-6">
+            {/* --- OPSI 1: HARGA NORMAL --- */}
+            <div 
+                onClick={() => setActiveTab('normal')}
+                className={`relative p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    activeTab === 'normal' 
+                    ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' 
+                    : 'border-gray-200 bg-white hover:border-blue-200'
+                }`}
+            >
+                <div className={`flex items-center gap-1 mb-1 text-xs font-bold ${activeTab === 'normal' ? 'text-blue-700' : 'text-gray-500'}`}>
+                    <Tag size={12} /> HARGA NORMAL
+                </div>
+                <div className="relative">
+                    <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
+                    <input 
+                        type="number"
+                        className={`w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none ${activeTab === 'normal' ? 'text-blue-700' : 'text-gray-700'}`}
+                        value={priceNormal}
+                        onChange={(e) => setPriceNormal(e.target.value)}
+                        onClick={(e) => {
+                            e.stopPropagation(); // Biar gak double trigger
+                            setActiveTab('normal');
+                        }}
+                    />
+                </div>
+                {activeTab === 'normal' && <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>}
             </div>
+
+            {/* --- OPSI 2: HARGA GROSIR --- */}
+            <div 
+                onClick={() => setActiveTab('wholesale')}
+                className={`relative p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    activeTab === 'wholesale' 
+                    ? 'border-green-500 bg-green-50 ring-1 ring-green-500' 
+                    : 'border-gray-200 bg-white hover:border-green-200'
+                }`}
+            >
+                <div className={`flex items-center gap-1 mb-1 text-xs font-bold ${activeTab === 'wholesale' ? 'text-green-700' : 'text-gray-500'}`}>
+                    <DollarSign size={12} /> HARGA GROSIR
+                </div>
+                <div className="relative">
+                    <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
+                    <input 
+                        type="number"
+                        className={`w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none ${activeTab === 'wholesale' ? 'text-green-700' : 'text-gray-700'}`}
+                        value={priceWholesale}
+                        onChange={(e) => setPriceWholesale(e.target.value)}
+                        onClick={(e) => {
+                            e.stopPropagation(); 
+                            setActiveTab('wholesale');
+                        }}
+                    />
+                </div>
+                {activeTab === 'wholesale' && <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
+        </div>
+
+        {/* Info Deal Final */}
+        <div className="bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-4 border border-gray-200">
+            <span className="text-xs font-bold text-gray-500">Total Masuk List:</span>
+            <span className={`text-xl font-bold ${activeTab === 'normal' ? 'text-blue-600' : 'text-green-600'}`}>
+                Rp {(activeTab === 'normal' ? parseFloat(priceNormal) || 0 : parseFloat(priceWholesale) || 0).toLocaleString()}
+            </span>
         </div>
 
         {/* Footer Actions */}
-        <div className="space-y-3">
-            <button 
-              onClick={handleConfirm}
-              className={`w-full text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl flex justify-center items-center gap-2 transition transform active:scale-95 ${
-                 product.wholesale_price > 0 && customPrice == product.wholesale_price 
-                 ? 'bg-green-600 hover:bg-green-700' 
-                 : 'bg-orange-500 hover:bg-orange-600'
-              }`}
-            >
-              <Plus size={20} /> Masukkan ke List
-            </button>
-        </div>
+        <button 
+            onClick={handleConfirm}
+            className={`w-full text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl flex justify-center items-center gap-2 transition transform active:scale-95 ${
+                activeTab === 'wholesale'
+                ? 'bg-green-600 hover:bg-green-700' 
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+        >
+            <Plus size={20} /> Simpan ke List
+        </button>
 
       </div>
     </div>
