@@ -42,8 +42,8 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
   const handleConfirm = () => {
     const modifiedProduct = {
         ...product,
-        price: parseFloat(priceNormal) || 0,           
-        wholesale_price: parseFloat(priceWholesale) || 0,
+        price: parseFloat(priceNormal),           
+        wholesale_price: parseFloat(priceWholesale),
     };
     onAddToExport(modifiedProduct);
   };
@@ -80,14 +80,14 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
                 <div className="flex items-center gap-1 mb-1 text-xs font-bold text-blue-700"><Tag size={12} /> HARGA NORMAL</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input type="number" className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700" value={priceNormal} onChange={(e) => setPriceNormal(e.target.value)} />
+                    <input type="number" placeholder='0' className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700" value={priceNormal} onChange={(e) => setPriceNormal(e.target.value)} />
                 </div>
             </div>
             <div className="relative p-3 rounded-xl border border-green-200 bg-green-50/50">
                 <div className="flex items-center gap-1 mb-1 text-xs font-bold text-green-700"><DollarSign size={12} /> HARGA GROSIR</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input type="number" className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700" value={priceWholesale} onChange={(e) => setPriceWholesale(e.target.value)} />
+                    <input type="number" placeholder='0' className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700" value={priceWholesale} onChange={(e) => setPriceWholesale(e.target.value)} />
                 </div>
             </div>
         </div>
