@@ -1,54 +1,69 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { useAuth } from './AuthProvider'; // Import auth
+import { useAuth } from './AuthProvider'; 
 
 const ExportContext = createContext();
 
 export const useExportList = () => useContext(ExportContext);
 
 export const ExportProvider = ({ children }) => {
-  const { user } = useAuth(); // Ambil user yang sedang login
+  const { user } = useAuth(); 
   const [exportList, setExportList] = useState([]);
 
   // 1. Fetch data saat user login
   useEffect(() => {
-    if (user) fetchExportList();
-    else setExportList([]); // Kosongkan jika logout
+    if (user) {
+        fetchExportList();
+    } else {
+        setExportList([]); 
+    }
   }, [user]);
 
   const fetchExportList = async () => {
-    const { data } = await supabase.from('export_items').select('*').order('created_at', { ascending: false });
+    // Ambil semua kolom (*) agar brand dan varian ikut terbawa
+    const { data } = await supabase
+        .from('export_items')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
     setExportList(data || []);
   };
 
-  // 2. Tambah Item (Simpan ke DB)
+  // 2. Tambah Item (PERBAIKAN DI SINI)
   const addToExportList = async (product) => {
     if (!user) return alert("Harus login dulu!");
 
     const newItem = {
-        user_id: user.id, // Kunci utama: Punya siapa item ini?
+        user_id: user.id,
         sku: product.sku,
         item_name: product.item_name,
         price: product.price,
         category: product.category,
+        // --- INI YANG TADI HILANG, SEKARANG DITAMBAHKAN ---
+        brand_name: product.brand_name || '-', 
+        variant_name: product.variant_name || '',
         qty: 1
     };
 
     const { error } = await supabase.from('export_items').insert([newItem]);
     
-    if (error) alert("Gagal simpan: " + error.message);
-    else fetchExportList(); // Refresh list
+    if (error) {
+        console.error("Error adding to export:", error);
+        alert("Gagal simpan: " + error.message);
+    } else {
+        fetchExportList(); // Refresh list agar data baru muncul
+    }
   };
 
-  // 3. Hapus Item (Hapus dari DB)
-  const removeFromExportList = async (id) => { // id di sini adalah id tabel export_items
+  // 3. Hapus Item
+  const removeFromExportList = async (id) => { 
     const { error } = await supabase.from('export_items').delete().eq('id', id);
     if (!error) fetchExportList();
   };
 
   // 4. Reset List
   const clearExportList = async () => {
-    const { error } = await supabase.from('export_items').delete().neq('id', 0); // Hapus semua punya user ini (RLS melindunginya)
+    const { error } = await supabase.from('export_items').delete().neq('id', 0); 
     if (!error) setExportList([]);
   };
 
