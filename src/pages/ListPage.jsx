@@ -10,17 +10,15 @@ const ListPage = () => {
   // --- LOGIKA HAPUS SEMUA ---
   const handleClearAll = () => {
     if (exportList.length === 0) return;
-
     if (window.confirm("⚠️ Yakin ingin menghapus SEMUA barang di list?")) {
         clearExportList();
     }
   };
 
-  // --- LOGIKA HAPUS SATUAN (PERBAIKAN DI SINI) ---
-  // Kita harus menggunakan ID (unik dari database), bukan SKU
+  // --- LOGIKA HAPUS SATUAN ---
   const handleDeleteItem = (id, name) => {
     if (window.confirm(`Yakin ingin menghapus "${name}" dari list?`)) {
-        removeFromExportList(id); // Kirim ID ke Context
+        removeFromExportList(id); 
     }
   };
 
@@ -28,7 +26,6 @@ const ListPage = () => {
   const handleDownload = () => {
     if (exportList.length === 0) return alert("List kosong!");
 
-    // Tambahkan header Wholesale juga agar lengkap
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price";
 
     const rows = exportList.map(item => {
@@ -38,7 +35,6 @@ const ListPage = () => {
       const brand = `"${item.brand_name || '-'}"`; 
       const variant = `"${item.variant_name || ''}"`;
       const price = item.price || 0;
-      // Jika di tabel export_items belum ada kolom wholesale, ini akan undefined (aman)
       const wholesale = item.wholesale_price || 0; 
 
       return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
@@ -140,13 +136,30 @@ const ListPage = () => {
 
                   </div>
 
-                  {/* Harga */}
-                  <div className="text-base font-bold text-blue-600 mt-2">
-                    Rp {item.price ? item.price.toLocaleString() : '0'}
+                  {/* --- BAGIAN HARGA (DIUPDATE) --- */}
+                  <div className="mt-2 flex items-baseline gap-3">
+                      {/* Harga Normal */}
+                      <div>
+                          <span className="text-[10px] text-gray-400 font-semibold block leading-none">Normal</span>
+                          <span className="text-base font-bold text-blue-600">
+                            Rp {item.price ? item.price.toLocaleString() : '0'}
+                          </span>
+                      </div>
+
+                      {/* Harga Grosir (Hanya muncul jika > 0) */}
+                      {item.wholesale_price > 0 && (
+                          <div className="pl-3 border-l border-gray-200">
+                              <span className="text-[10px] text-gray-400 font-semibold block leading-none">Grosir</span>
+                              <span className="text-sm font-bold text-green-600">
+                                Rp {item.wholesale_price.toLocaleString()}
+                              </span>
+                          </div>
+                      )}
                   </div>
+
                 </div>
 
-                {/* Tombol Hapus Per Item (PERBAIKAN: GUNAKAN ID) */}
+                {/* Tombol Hapus Per Item */}
                 <button 
                   onClick={() => handleDeleteItem(item.id, item.item_name)} 
                   className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition mt-1"
