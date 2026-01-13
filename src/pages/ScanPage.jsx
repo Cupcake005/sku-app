@@ -24,6 +24,12 @@ const ScanPage = () => {
   const [pendingSku, setPendingSku] = useState('');     // Jika terisi, Modal Tambah Baru Muncul
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // [BARU] State untuk template data saat Edit/Tambah Varian
+  const [productFormDefault, setProductFormDefault] = useState(null);
+
+  // [BARU] Database Lokal untuk deteksi varian
+  const [allProducts, setAllProducts] = useState([]);
+
   // Scanner State
   const [isCameraActive, setIsCameraActive] = useState(() => {
     return localStorage.getItem('camera_active') === 'false' ? false : true;
@@ -33,6 +39,23 @@ const ScanPage = () => {
   useEffect(() => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
+
+  // --- 1. FETCH ALL PRODUCTS (Agar Modal bisa baca varian) ---
+  useEffect(() => {
+    const fetchAllProducts = async () => {
+      try {
+        const { data, error } = await supabase.from('products').select('*');
+        if (error) throw error;
+        if (data) setAllProducts(data);
+      } catch (error) {
+        console.error("Error fetching all products:", error.message);
+      }
+    };
+
+    if (user) {
+        fetchAllProducts();
+    }
+  }, [user]);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,8 +98,6 @@ const ScanPage = () => {
     }
     
     // Langsung kirim product ke ExportContext
-    // (Karena object 'product' ini sudah dimodifikasi oleh Modal Result 
-    // berisi price & wholesale_price yang baru diedit user)
     addToExportList(product);
     
     // Tutup Modal & Reset
@@ -84,18 +105,28 @@ const ScanPage = () => {
     clearSearch();
   };
 
+  // --- LOGIKA SCAN ---
   const handleScan = async (sku) => {
     playBeep();
     setLoading(true);
     clearSearch(); 
     try {
-      const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
+      // Optimasi: Cek di local state dulu
+      const localProduct = allProducts.find(p => p.sku === sku);
       
-      if (data) { 
-        setProductData(data); // <--- INI AKAN MEMICU MODAL RESULT MUNCUL
-      } else { 
-        setPendingSku(sku); 
-        setShowAddModal(true); 
+      if (localProduct) {
+         setProductData(localProduct);
+      } else {
+         // Fallback ke DB
+         const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
+         
+         if (data) { 
+            setProductData(data);
+            setAllProducts(prev => [...prev, data]);
+         } else { 
+            setPendingSku(sku); 
+            setShowAddModal(true); 
+         }
       }
     } catch (error) { 
       console.error(error); 
@@ -104,57 +135,97 @@ const ScanPage = () => {
     }
   };
 
-  const handleSaveNewProduct = async (formData) => {
+  // --- LOGIKA SIMPAN PRODUK (HANDLE INSERT & UPDATE) ---
+  const handleSaveProduct = async (formData, isVariantMode = false) => {
     if(!user) return alert("Sesi habis");
     setLoading(true);
     
-    const { data, error } = await supabase
-        .from('products')
-        .insert([{
-            user_id: user.id, 
-            sku: formData.sku || '-',
-            item_name: formData.item_name,
-            category: formData.category,
-            brand_name: formData.brand_name || '-',
-            variant_name: formData.variant_name,
-            price: parseFloat(formData.price) || 0,
-            wholesale_price: parseFloat(formData.wholesale_price) || 0
-        }])
-        .select()
-        .single();
+    // Cek apakah Edit (Update) atau Baru (Insert)
+    const isUpdate = !isVariantMode && productFormDefault && productFormDefault.id;
+    let error, data;
+
+    const payload = {
+        sku: formData.sku,
+        item_name: formData.item_name,
+        category: formData.category,
+        brand_name: formData.brand_name || '-',
+        variant_name: formData.variant_name,
+        price: parseFloat(formData.price) || 0,
+        wholesale_price: parseFloat(formData.wholesale_price) || 0,
+        unit: formData.unit || 'Pcs'
+    };
+
+    if (isUpdate) {
+        // UPDATE
+        const res = await supabase.from('products')
+            .update(payload)
+            .eq('id', productFormDefault.id)
+            .select().single();
+        error = res.error;
+        data = res.data;
+    } else {
+        // INSERT
+        const res = await supabase.from('products')
+            .insert([{ ...payload, user_id: user.id }])
+            .select().single();
+        error = res.error;
+        data = res.data;
+    }
 
     setLoading(false);
 
     if (error) {
         alert('Gagal menyimpan: ' + error.message);
     } else {
-        alert('✅ Produk berhasil ditambahkan!');
+        alert(isUpdate ? '✅ Produk Berhasil Diupdate!' : '✅ Produk Baru Ditambahkan!');
         setShowAddModal(false); 
-        setProductData(data); // <--- INI JUGA MEMICU MODAL RESULT MUNCUL SETELAH DISIMPAN
+        setProductFormDefault(null); 
+
+        // Update State Lokal
+        if (data) {
+            if (isUpdate) {
+                setAllProducts(prev => prev.map(p => p.id === data.id ? data : p));
+                setSearchResults(prev => prev.map(p => p.id === data.id ? data : p));
+            } else {
+                setAllProducts(prev => [...prev, data]);
+            }
+            // Buka kembali modal result dengan data terbaru
+            setProductData(data); 
+        }
     }
   };
+
+  // --- LOGIKA EDIT MASTER / TAMBAH VARIAN ---
+  const handleEditMaster = (productToEdit) => {
+      setProductData(null); // Tutup modal result
+      setProductFormDefault(productToEdit); // Isi template form
+      setShowAddModal(true); // Buka modal master
+  };
   
-  const handleSearch = async (e) => {
+  // --- LOGIKA SEARCH (Local Filter) ---
+  const handleSearch = (e) => {
       e.preventDefault();
-      if (!searchQuery.trim()) return;
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return;
+
       setLoading(true);
       setIsSearching(true);
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .or(`sku.ilike.%${searchQuery}%,item_name.ilike.%${searchQuery}%`)
-          .limit(20);
-        if (error) throw error;
-        setSearchResults(data || []);
-      } catch (error) { alert(error.message); } finally { setLoading(false); }
+
+      const results = allProducts.filter(item => {
+          const name = (item.item_name || '').toLowerCase();
+          const sku = (item.sku || '').toLowerCase();
+          // Filter sederhana: Nama atau SKU
+          return name.includes(query) || sku.includes(query);
+      }).slice(0, 20); // Limit 20 biar ringan
+
+      setSearchResults(results);
+      setLoading(false);
   };
 
   const clearSearch = () => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); };
 
-  // Helper untuk klik item search agar tidak bentrok dengan tombol copy
   const handleItemClick = (item) => {
-      setProductData(item); // Buka Modal Result
+      setProductData(item); 
   };
 
   return (
@@ -186,7 +257,6 @@ const ScanPage = () => {
             </div>
              <div className="space-y-3">
                 {searchResults.map((item) => (
-                  // Klik Row untuk Buka Modal Result
                   <div 
                     key={item.id} 
                     onClick={() => handleItemClick(item)} 
@@ -194,10 +264,8 @@ const ScanPage = () => {
                   >
                     <div className="flex-1">
                       <div className="font-bold text-gray-800">{item.item_name}</div>
-                      
                       <div className="flex items-center gap-2 mb-1">
                         <div className="text-xs text-gray-500">{item.sku}</div>
-                        {/* Stop Propagation agar klik copy tidak membuka modal */}
                         <button 
                             onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
                             className="text-gray-400 hover:text-blue-600 transition p-1 bg-gray-50 rounded"
@@ -205,18 +273,15 @@ const ScanPage = () => {
                             {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                         </button>
                       </div>
-
                       <div className="flex flex-wrap gap-1">
                         {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
                         {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
                       </div>
                     </div>
-                    
-                    {/* Tombol Quick Add (Langsung tambah tanpa modal - Pakai harga asli DB) */}
                     <button 
                         onClick={(e) => {
-                            e.stopPropagation(); // Biar gak buka modal
-                            addToExportList(item); // Langsung kirim item asli
+                            e.stopPropagation(); 
+                            addToExportList(item); 
                             clearSearch();
                         }} 
                         className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
@@ -287,21 +352,27 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* --- MODAL 1: CREATE NEW PRODUCT (Untuk Data Baru) --- */}
+      {/* --- MODAL 1: CREATE / EDIT PRODUCT (Master Data) --- */}
       <ProductModal 
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        product={{ sku: pendingSku }} 
-        onSave={handleSaveNewProduct}
+        onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} 
+        // Logic: Jika ada productFormDefault (dari edit), pakai itu. Jika tidak, pakai sku pending (dari scan baru)
+        product={productFormDefault || { sku: pendingSku }} 
+        onSave={handleSaveProduct}
+        allProducts={allProducts} // Kirim data untuk cek duplikat/varian di dalam modal
       />
 
       {/* --- MODAL 2: RESULT & ADD TO LIST (Untuk Edit Harga Transaksi) --- */}
-      {/* Cukup render ini, dia akan muncul otomatis jika productData terisi */}
       <ProductResultModal 
         isOpen={!!productData} 
         onClose={() => setProductData(null)}
         product={productData}
         onAddToExport={handleAddItem}
+        
+        // Props tambahan untuk fitur varian & edit
+        allProducts={allProducts} 
+        setIsScannerActive={setIsCameraActive} 
+        onEditMaster={handleEditMaster} 
       />
 
     </div>

@@ -1,41 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Edit3, Tag, DollarSign } from 'lucide-react';
+import { X, Plus, Edit, Tag, DollarSign, Layers, Package, CheckCircle } from 'lucide-react';
 
-const ProductResultModal = ({ isOpen, onClose, product, onAddToExport }) => {
+const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProducts = [], onEditMaster }) => {
   const [priceNormal, setPriceNormal] = useState('');
   const [priceWholesale, setPriceWholesale] = useState('');
+  const [variants, setVariants] = useState([]);
 
   useEffect(() => {
-    if (product) {
+    if (product && isOpen) {
       setPriceNormal(product.price || 0);
       setPriceWholesale(product.wholesale_price || 0);
+
+      // --- LOGIC CARI VARIAN (Sama seperti sebelumnya) ---
+      if (allProducts.length > 0) {
+        const cleanName = (str) => String(str).toLowerCase().trim().replace(/\s+/g, ' ');
+        const targetName = cleanName(product.item_name);
+        const targetCategory = cleanName(product.category);
+
+        const foundVariants = allProducts.filter(p => {
+            if (p.id === product.id) return false;
+            const pName = cleanName(p.item_name);
+            const pCategory = cleanName(p.category);
+            return pName === targetName && pCategory === targetCategory;
+        }).map(v => ({
+            id: v.id,
+            sku: v.sku,
+            variant_display: v.variant_name || v.unit || 'Varian Lain',
+            price: v.price,
+            wholesale_price: v.wholesale_price,
+            isExisting: true 
+        }));
+        setVariants(foundVariants);
+      } else {
+        setVariants([]);
+      }
     }
-  }, [product]);
+  }, [product, isOpen, allProducts]);
 
   if (!isOpen || !product) return null;
 
   const handleConfirm = () => {
-    // Kita update object produk dengan DUA harga terbaru yang diedit user
     const modifiedProduct = {
         ...product,
         price: parseFloat(priceNormal) || 0,           
-        wholesale_price: parseFloat(priceWholesale) || 0 
+        wholesale_price: parseFloat(priceWholesale) || 0,
     };
-
-    // Kirim object lengkap ini ke ScanPage -> ExportContext
     onAddToExport(modifiedProduct);
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fade-in">
-      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 relative border border-blue-100 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 relative border border-blue-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
         
-        <button 
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full z-10"
-        >
-          <X size={24} />
-        </button>
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full z-10"><X size={24} /></button>
 
         <div className="text-center mb-6">
             <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-3 inline-block text-xs font-bold shadow-sm uppercase tracking-wider">
@@ -44,61 +61,63 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport }) => {
             <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">
                 {product.item_name}
             </h2>
-            <div className="text-gray-500 text-xs">
-                SKU: {product.sku}
-                {product.brand_name !== '-' && <span className="mx-1">•</span>}
-                {product.brand_name !== '-' && product.brand_name}
+            <div className="text-gray-500 text-xs mt-1">
+                SKU: {product.sku} {product.brand_name !== '-' && `• ${product.brand_name}`}
             </div>
+
+            {/* --- TOMBOL EDIT MASTER DATA --- */}
+            <button 
+                onClick={() => onEditMaster(product)}
+                className="mt-3 text-xs bg-orange-50 text-orange-600 border border-orange-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 mx-auto hover:bg-orange-100 transition"
+            >
+                <Edit size={12} /> Edit Data / Tambah Varian
+            </button>
         </div>
 
-        {/* --- EDIT 2 HARGA (KEDUANYA AKTIF) --- */}
-        <div className="mb-2 text-xs font-bold text-gray-400 uppercase tracking-wide text-center">
-            Edit Harga Untuk Export
-        </div>
-
+        {/* --- FORM HARGA TRANSAKSI --- */}
         <div className="space-y-3 mb-6">
-            {/* INPUT HARGA NORMAL */}
             <div className="relative p-3 rounded-xl border border-blue-200 bg-blue-50/50">
-                <div className="flex items-center gap-1 mb-1 text-xs font-bold text-blue-700">
-                    <Tag size={12} /> HARGA NORMAL
-                </div>
+                <div className="flex items-center gap-1 mb-1 text-xs font-bold text-blue-700"><Tag size={12} /> HARGA NORMAL</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input 
-                        type="number"
-                        className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700 placeholder-blue-300"
-                        value={priceNormal}
-                        onChange={(e) => setPriceNormal(e.target.value)}
-                        placeholder="0"
-                    />
-                    <Edit3 size={14} className="absolute right-0 top-2 text-blue-300 pointer-events-none" />
+                    <input type="number" className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700" value={priceNormal} onChange={(e) => setPriceNormal(e.target.value)} />
                 </div>
             </div>
-
-            {/* INPUT HARGA GROSIR */}
             <div className="relative p-3 rounded-xl border border-green-200 bg-green-50/50">
-                <div className="flex items-center gap-1 mb-1 text-xs font-bold text-green-700">
-                    <DollarSign size={12} /> HARGA GROSIR
-                </div>
+                <div className="flex items-center gap-1 mb-1 text-xs font-bold text-green-700"><DollarSign size={12} /> HARGA GROSIR</div>
                 <div className="relative">
                     <span className="absolute left-0 top-1.5 text-xs font-bold text-gray-400">Rp</span>
-                    <input 
-                        type="number"
-                        className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700 placeholder-green-300"
-                        value={priceWholesale}
-                        onChange={(e) => setPriceWholesale(e.target.value)}
-                        placeholder="0"
-                    />
-                    <Edit3 size={14} className="absolute right-0 top-2 text-green-300 pointer-events-none" />
+                    <input type="number" className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700" value={priceWholesale} onChange={(e) => setPriceWholesale(e.target.value)} />
                 </div>
             </div>
         </div>
 
-        <button 
-            onClick={handleConfirm}
-            className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2 transition transform active:scale-95"
-        >
-            <Plus size={20} /> Simpan Keduanya ke List
+        {/* --- LIST VARIAN --- */}
+        {variants.length > 0 && (
+            <div className="border-t border-gray-100 pt-4 mb-4">
+                <div className="flex justify-between items-center mb-3">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                        <Layers size={14}/> Varian Lain ({variants.length})
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    {variants.map((v) => (
+                        <div key={v.id} className="p-3 rounded-xl border border-gray-200 bg-white flex justify-between items-center">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded"><Package size={10} className="inline mr-1"/>{v.variant_display}</span>
+                                </div>
+                                <div className="text-[10px] text-gray-400 font-mono">SKU: {v.sku}</div>
+                            </div>
+                            <div className="text-right text-xs font-bold text-blue-600">Rp {v.price.toLocaleString()}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        <button onClick={handleConfirm} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
+            <Plus size={20} /> Masukkan Ke List
         </button>
 
       </div>
