@@ -68,8 +68,24 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
             <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">
                 {product.item_name}
             </h2>
-            <div className="text-gray-500 text-xs mt-1">
-                SKU: {product.sku} {product.brand_name !== '-' && `• ${product.brand_name}`}
+            
+            {/* --- UPDATE: TAMPILKAN SKU & UNIT --- */}
+            <div className="flex justify-center items-center gap-2 text-gray-500 text-xs mt-1">
+                <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200 font-mono">
+                    {product.sku}
+                </span>
+                
+                {/* Tampilkan Nama Varian / Unit (Pcs, Pack, dll) */}
+                {(product.variant_name || product.unit) && (
+                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold uppercase flex items-center gap-1">
+                        <Package size={10} />
+                        {product.variant_name || product.unit}
+                    </span>
+                )}
+            </div>
+
+            <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-wide">
+                {product.category} {product.brand_name !== '-' && `• ${product.brand_name}`}
             </div>
 
             {/* --- TOMBOL EDIT MASTER DATA --- */}
@@ -91,7 +107,7 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
                     <input 
                         type="number" 
                         className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700 placeholder-blue-300"
-                        value={priceNormal === 0 ? '' : priceNormal} // <--- FIX: Kosong jika 0
+                        value={priceNormal === 0 ? '' : priceNormal} // Kosong jika 0
                         onChange={(e) => setPriceNormal(e.target.value)} 
                         placeholder="0"
                     />
@@ -106,7 +122,7 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
                     <input 
                         type="number" 
                         className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700 placeholder-green-300"
-                        value={priceWholesale === 0 ? '' : priceWholesale} // <--- FIX: Kosong jika 0
+                        value={priceWholesale === 0 ? '' : priceWholesale} // Kosong jika 0
                         onChange={(e) => setPriceWholesale(e.target.value)} 
                         placeholder="0"
                     />
@@ -127,7 +143,10 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
                         <div key={v.id} className="p-3 rounded-xl border border-gray-200 bg-white flex justify-between items-center">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded"><Package size={10} className="inline mr-1"/>{v.variant_display}</span>
+                                    <span className="text-xs font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                        <Package size={10} className="inline"/>
+                                        {v.variant_display}
+                                    </span>
                                 </div>
                                 <div className="text-[10px] text-gray-400 font-mono">SKU: {v.sku}</div>
                             </div>
