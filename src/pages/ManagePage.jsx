@@ -1,61 +1,61 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../AuthProvider'; // <--- Import Auth
 import Scanner from '../components/Scanner';
-import ProductModal from '../components/ProductModal'; // Import Modal Baru
+import ProductModal from '../components/ProductModal';
 import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
 
 const ManagePage = () => {
+  const { user } = useAuth(); // <--- Ambil Data User Login
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // --- STATE UNTUK MODAL ---
+  // --- STATE MODAL & SCANNER ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState(null); // null = Mode Tambah, object = Mode Edit
-
+  const [currentProduct, setCurrentProduct] = useState(null); // null = Mode Tambah
   const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
-  // --- LOGIKA MENANGKAP SKU DARI URL ---
+  // --- 1. LOGIKA INIT & URL PARAM ---
   useEffect(() => {
-    fetchProducts();
+    if (user) {
+        fetchProducts();
+    }
+    
     const skuFromUrl = searchParams.get('sku');
     if (skuFromUrl) {
       setCurrentProduct({ sku: skuFromUrl }); 
       setIsModalOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
 
-const fetchProducts = async () => {
+  // --- 2. FETCH DATA (CHUNK LOOP - BYPASS 1000 LIMIT) ---
+  const fetchProducts = async () => {
     setLoading(true);
     try {
         let allData = [];
         let from = 0;
-        const step = 1000; // Ambil per 1000 data
+        const step = 1000; // Ambil per 1000 baris
         let more = true;
 
-        // Loop: Ambil data terus menerus sampai habis
         while (more) {
             const { data, error } = await supabase
                 .from('products')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .range(from, from + step - 1); // 0-999, lalu 1000-1999, dst...
+                .range(from, from + step - 1);
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                allData = [...allData, ...data]; // Gabungkan data baru ke data lama
+                allData = [...allData, ...data];
                 from += step;
-                
-                // Jika data yang ditarik kurang dari 1000, berarti itu kloter terakhir
-                if (data.length < step) {
-                    more = false;
-                }
+                if (data.length < step) more = false; // Data habis
             } else {
-                more = false; // Tidak ada data lagi
+                more = false;
             }
         }
         
@@ -67,17 +67,18 @@ const fetchProducts = async () => {
     }
   };
 
-  // --- FUNGSI SAVE (CREATE, UPDATE & VARIAN DIJADIKAN SATU) ---
+  // --- 3. SAVE PRODUCT (CREATE, UPDATE & VARIANT) ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
+    if (!user) return alert("Sesi habis. Silakan login ulang.");
     setLoading(true);
     
-    // Update terjadi HANYA jika: Bukan mode varian, Ada produk diedit, dan Punya ID
+    // Logika Update: HANYA JIKA bukan mode varian, ada produk, dan ada ID
     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
 
     let error;
 
     if (isUpdate) {
-      // --- UPDATE (EDIT DATA LAMA) ---
+      // --- UPDATE (Edit Data Lama) ---
       const { error: err } = await supabase
         .from('products')
         .update({
@@ -91,10 +92,12 @@ const fetchProducts = async () => {
         .eq('id', currentProduct.id);
       error = err;
     } else {
-      // --- CREATE (DATA BARU / VARIAN BARU) ---
+      // --- CREATE (Data Baru / Varian Baru) ---
+      // PENTING: Tambahkan user_id agar data terikat ke akun ini
       const { error: err } = await supabase
         .from('products')
         .insert([{
+          user_id: user.id, // <--- KUNCI AUTH
           sku: formData.sku || '-',
           item_name: formData.item_name,
           category: formData.category,
@@ -115,7 +118,6 @@ const fetchProducts = async () => {
         : (isUpdate ? '✅ Produk berhasil diperbarui!' : '✅ Produk berhasil ditambahkan!');
       
       alert(successMsg);
-      
       setIsModalOpen(false);
       setCurrentProduct(null);
       setSearchParams({});
@@ -123,7 +125,7 @@ const fetchProducts = async () => {
     }
   };
 
-  // Fungsi Hapus
+  // --- 4. HAPUS DATA ---
   const handleDelete = async (id, name) => {
     if (window.confirm(`Yakin hapus "${name}"?`)) {
       const { error } = await supabase.from('products').delete().eq('id', id);
@@ -132,19 +134,18 @@ const fetchProducts = async () => {
     }
   };
 
-  // Fungsi Buka Modal Tambah Manual
+  // --- 5. MODAL CONTROL ---
   const handleOpenAdd = () => {
     setCurrentProduct(null);
     setIsModalOpen(true);
   };
 
-  // Fungsi Buka Modal Edit
   const handleOpenEdit = (item) => {
     setCurrentProduct(item);
     setIsModalOpen(true);
   };
 
-  // Fungsi Import Export
+  // --- 6. EXPORT CSV ---
   const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price";
@@ -162,13 +163,18 @@ const fetchProducts = async () => {
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", "Database_Produk_SKU_MASTER.csv");
+      link.setAttribute("download", `Database_Toko_${new Date().toISOString().slice(0,10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
   };
 
-  const handleImportClick = () => { if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama. Lanjutkan?")) fileInputRef.current.click(); };
+  // --- 7. IMPORT CSV (DENGAN AUTH) ---
+  const handleImportClick = () => { 
+      if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
+          fileInputRef.current.click(); 
+      }
+  };
   
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -180,48 +186,81 @@ const fetchProducts = async () => {
   };
 
   const processImport = async (csvText) => { 
+      if (!user) return alert("Harus login untuk import!");
       setLoading(true);
       try {
         const lines = csvText.split('\n');
         const dataToInsert = [];
+        
+        // Helper parse CSV line taking quotes into account
         const parseCSVLine = (text) => {
             const result = []; let current = ''; let inQuotes = false;
             for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            if (char === '"') inQuotes = !inQuotes; 
-            else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; } 
-            else current += char; 
+                const char = text[i];
+                if (char === '"') inQuotes = !inQuotes; 
+                else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; } 
+                else current += char; 
             }
             result.push(current.trim()); return result;
         };
+
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
             const columns = parseCSVLine(line);
             if (columns.length >= 6) {
-            const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
-            const category = clean(columns[0]); let sku = clean(columns[1]); const item_name = clean(columns[2]); 
-            const brand_name = clean(columns[3]); const variant_name = clean(columns[4]);
-            let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); const price = parseFloat(priceStr) || 0;
-            if (!sku) sku = "-";
-            if (item_name) { dataToInsert.push({ category, sku: String(sku), item_name, brand_name, variant_name, price }); }
+                const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
+                const category = clean(columns[0]); 
+                let sku = clean(columns[1]); 
+                const item_name = clean(columns[2]); 
+                const brand_name = clean(columns[3]); 
+                const variant_name = clean(columns[4]);
+                let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
+                const price = parseFloat(priceStr) || 0;
+                
+                if (!sku) sku = "-";
+                
+                if (item_name) { 
+                    dataToInsert.push({ 
+                        user_id: user.id, // <--- PENTING: Import data ke akun user ini
+                        category, 
+                        sku: String(sku), 
+                        item_name, 
+                        brand_name, 
+                        variant_name, 
+                        price 
+                    }); 
+                }
             }
         }
+
         if (dataToInsert.length > 0) {
-            const { error: deleteError } = await supabase.from('products').delete().not('id', 'is', null);
+            // Hapus data lama milik user ini saja (aman karena RLS)
+            const { error: deleteError } = await supabase.from('products').delete().neq('id', 0); // Hack delete all
             if (deleteError) throw deleteError;
+
+            // Insert data baru
             const { error: insertError } = await supabase.from('products').insert(dataToInsert);
             if (insertError) throw insertError;
-            alert(`✅ Sukses! ${dataToInsert.length} data baru dimasukkan.`); fetchProducts(); 
-        } else { alert("⚠️ File kosong/format salah."); }
-      } catch (error) { alert('Gagal Import: ' + error.message); } finally { setLoading(false); }
+            
+            alert(`✅ Sukses! ${dataToInsert.length} data baru dimasukkan.`); 
+            fetchProducts(); 
+        } else { 
+            alert("⚠️ File kosong atau format salah."); 
+        }
+      } catch (error) { 
+          alert('Gagal Import: ' + error.message); 
+      } finally { 
+          setLoading(false); 
+      }
   };
 
+  // --- 8. UI HELPERS ---
   const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
   const filteredProducts = products.filter(item => 
-    item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchQuery.toLowerCase())
+    (item.item_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -232,8 +271,8 @@ const fetchProducts = async () => {
         <div className="text-center mb-6">
             <h2 className="text-xl font-bold text-blue-600">Manajemen Database</h2>
             <div className="inline-flex items-center gap-2 mt-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            <p className="text-xs font-bold text-blue-700">Total : {products.length} Produk</p>
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <p className="text-xs font-bold text-blue-700">Total : {products.length} Produk</p>
             </div>
         </div>
 
@@ -278,7 +317,7 @@ const fetchProducts = async () => {
           <div className="space-y-3">
              <div className="text-xs text-gray-400 mb-2 text-right">Menampilkan {filteredProducts.length} dari {products.length} data</div>
             {filteredProducts.map((item) => (
-              <div key={item.id} className="border p-3 rounded-lg shadow-sm bg-gray-50 flex justify-between items-center">
+              <div key={item.id} className="border p-3 rounded-lg shadow-sm bg-gray-50 flex justify-between items-center hover:bg-gray-50 transition">
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
