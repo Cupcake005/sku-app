@@ -45,6 +45,7 @@ const ManagePage = () => {
             const { data, error } = await supabase
                 .from('products')
                 .select('*')
+                .eq('user_id', user.id) // Filter by User ID
                 .order('created_at', { ascending: false })
                 .range(from, from + step - 1);
 
@@ -77,34 +78,32 @@ const ManagePage = () => {
 
     let error;
 
+    const payload = {
+        sku: formData.sku,
+        item_name: formData.item_name,
+        category: formData.category,
+        brand_name: formData.brand_name,
+        variant_name: formData.variant_name,
+        price: parseFloat(formData.price),
+        wholesale_price: parseFloat(formData.wholesale_price) || 0,
+        unit: formData.unit || 'Pcs'
+    };
+
     if (isUpdate) {
       // --- UPDATE (Edit Data Lama) ---
       const { error: err } = await supabase
         .from('products')
-        .update({
-          sku: formData.sku,
-          item_name: formData.item_name,
-          category: formData.category,
-          brand_name: formData.brand_name,
-          variant_name: formData.variant_name,
-          price: parseFloat(formData.price),
-          wholesale_price: parseFloat(formData.wholesale_price) || 0 // Update Grosir
-        })
-        .eq('id', currentProduct.id);
+        .update(payload)
+        .eq('id', currentProduct.id)
+        .eq('user_id', user.id);
       error = err;
     } else {
       // --- CREATE (Data Baru / Varian Baru) ---
       const { error: err } = await supabase
         .from('products')
         .insert([{
-          user_id: user.id, // Bind ke User
-          sku: formData.sku || '-',
-          item_name: formData.item_name,
-          category: formData.category,
-          brand_name: formData.brand_name || '-',
-          variant_name: formData.variant_name,
-          price: parseFloat(formData.price) || 0,
-          wholesale_price: parseFloat(formData.wholesale_price) || 0 // Simpan Grosir
+          ...payload,
+          user_id: user.id // Bind ke User
         }]);
       error = err;
     }
@@ -129,7 +128,7 @@ const ManagePage = () => {
   // --- 4. HAPUS DATA ---
   const handleDelete = async (id, name) => {
     if (window.confirm(`Yakin hapus "${name}"?`)) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase.from('products').delete().eq('id', id).eq('user_id', user.id);
       if (error) alert('Gagal hapus: ' + error.message);
       else setProducts(products.filter(item => item.id !== id));
     }
@@ -149,16 +148,17 @@ const ManagePage = () => {
   // --- 6. EXPORT CSV (UPDATE: TAMBAH KOLOM GROSIR) ---
   const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
-      const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+      const header = "Category,SKU,Unit,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
       const rows = products.map(item => {
         const category = `"${item.category || ''}"`;
         const sku = `"${item.sku || ''}"`; 
+        const unit = `"${item.unit || ''}"`;
         const name = `"${item.item_name || ''}"`;
         const brand = `"${item.brand_name || ''}"`;
         const variant = `"${item.variant_name || ''}"`;
         const price = item.price || 0;
         const wholesale = item.wholesale_price || 0;
-        return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+        return `${category},${sku},${unit},${name},${brand},${variant},${price},${wholesale}`;
       });
       const csvContent = [header, ...rows].join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -208,19 +208,20 @@ const ManagePage = () => {
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
             const columns = parseCSVLine(line);
-            if (columns.length >= 6) {
+            if (columns.length >= 7) { // Adjusted for unit column
                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
                 const category = clean(columns[0]); 
                 let sku = clean(columns[1]); 
-                const item_name = clean(columns[2]); 
-                const brand_name = clean(columns[3]); 
-                const variant_name = clean(columns[4]);
+                const unit = clean(columns[2]);
+                const item_name = clean(columns[3]); 
+                const brand_name = clean(columns[4]); 
+                const variant_name = clean(columns[5]);
                 
-                let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
+                let priceStr = clean(columns[6]).replace(/[^0-9.]/g, ''); 
                 const price = parseFloat(priceStr) || 0;
 
-                // Ambil harga grosir (kolom ke-7 jika ada)
-                let wholesaleStr = columns[6] ? clean(columns[6]).replace(/[^0-9.]/g, '') : '0';
+                // Ambil harga grosir (kolom ke-8 jika ada)
+                let wholesaleStr = columns[7] ? clean(columns[7]).replace(/[^0-9.]/g, '') : '0';
                 const wholesale_price = parseFloat(wholesaleStr) || 0;
                 
                 if (!sku) sku = "-";
@@ -230,6 +231,7 @@ const ManagePage = () => {
                         user_id: user.id, 
                         category, 
                         sku: String(sku), 
+                        unit: unit || 'Pcs',
                         item_name, 
                         brand_name, 
                         variant_name, 
@@ -242,7 +244,7 @@ const ManagePage = () => {
 
         if (dataToInsert.length > 0) {
             // Hapus data lama milik user ini saja (aman karena RLS)
-            const { error: deleteError } = await supabase.from('products').delete().neq('id', 0); 
+            const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
             if (deleteError) throw deleteError;
 
             // Insert data baru
@@ -332,6 +334,7 @@ const ManagePage = () => {
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
+                    {item.unit && <span className="bg-green-50 text-green-600 px-1.5 py-0.5 rounded text-[10px] border border-green-100 font-medium">{item.unit}</span>}
                   </div>
                   
                   {/* Info Harga */}
@@ -368,6 +371,7 @@ const ManagePage = () => {
         product={currentProduct}
         onSave={handleSaveProduct}
         onScanClick={() => { setIsModalOpen(false); setShowScanner(true); }} 
+        allProducts={products} // Pass allProducts to modal!
       />
 
     </div>
