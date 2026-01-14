@@ -203,20 +203,44 @@ const ScanPage = () => {
   };
   
   // --- LOGIKA SEARCH (Local Filter) ---
-  const handleSearch = (e) => {
+  // --- LOGIKA SEARCH (HYBRID: LOCAL + DB FALLBACK) ---
+  const handleSearch = async (e) => {
       e.preventDefault();
       const query = searchQuery.toLowerCase().trim();
+      
       if (!query) return;
 
       setLoading(true);
       setIsSearching(true);
 
-      const results = allProducts.filter(item => {
+      // 1. Coba cari di local state dulu (allProducts)
+      let results = allProducts.filter(item => {
           const name = (item.item_name || '').toLowerCase();
           const sku = (item.sku || '').toLowerCase();
-          // Filter sederhana: Nama atau SKU
-          return name.includes(query) || sku.includes(query);
-      }).slice(0, 20); // Limit 20 biar ringan
+          const barcode = (item.barcode || '').toLowerCase(); // Tambah support barcode
+          return name.includes(query) || sku.includes(query) || barcode.includes(query);
+      });
+
+      // 2. Jika hasil lokal sedikit (< 5) atau kosong, cari ke Database Supabase
+      // Ini penting jika allProducts belum memuat semua data (misal pagination)
+      if (results.length < 5) {
+          try {
+              const { data, error } = await supabase
+                  .from('products')
+                  .select('*')
+                  .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%,barcode.eq.${query}`) // Case insensitive search
+                  .limit(20);
+              
+              if (!error && data) {
+                  // Gabungkan hasil DB dengan hasil lokal (hindari duplikat)
+                  const existingIds = new Set(results.map(r => r.id));
+                  const newItems = data.filter(d => !existingIds.has(d.id));
+                  results = [...results, ...newItems];
+              }
+          } catch (err) {
+              console.error("Search DB Error:", err);
+          }
+      }
 
       setSearchResults(results);
       setLoading(false);
