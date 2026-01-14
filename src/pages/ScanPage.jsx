@@ -7,8 +7,8 @@ import { useAuth } from '../AuthProvider';
 
 // KOMPONEN:
 import Scanner from '../components/Scanner'; 
-import ProductModal from '../components/ProductModal'; // Modal Tambah/Edit (Master Data)
-import ProductResultModal from '../components/ProductResultModal'; // Modal Hasil Scan
+import ProductModal from '../components/ProductModal'; 
+import ProductResultModal from '../components/ProductResultModal'; 
 
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
@@ -24,10 +24,10 @@ const ScanPage = () => {
   const [pendingSku, setPendingSku] = useState('');     
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // State untuk Edit/Tambah Varian
+  // State Template Edit
   const [productFormDefault, setProductFormDefault] = useState(null); 
 
-  // Database Lokal (Tetap diambil untuk keperluan deteksi varian di dalam Modal)
+  // Database Lokal
   const [allProducts, setAllProducts] = useState([]);
 
   // Scanner State
@@ -40,11 +40,10 @@ const ScanPage = () => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
 
-  // --- 1. FETCH ALL PRODUCTS (Background process untuk Varian) ---
+  // --- 1. FETCH ALL PRODUCTS ---
   useEffect(() => {
     const fetchAllProducts = async () => {
       try {
-        // Ambil semua data untuk kebutuhan deteksi varian "saudara" di modal
         const { data, error } = await supabase.from('products').select('*');
         if (error) throw error;
         if (data) setAllProducts(data);
@@ -55,6 +54,8 @@ const ScanPage = () => {
 
     if (user) {
         fetchAllProducts();
+        const interval = setInterval(fetchAllProducts, 5000);
+        return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -69,24 +70,10 @@ const ScanPage = () => {
   const handleCopySku = async (sku) => {
     if (!sku || sku === '-') return;
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(sku);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = sku;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
+      await navigator.clipboard.writeText(sku);
       setCopiedSku(sku);
       setTimeout(() => setCopiedSku(null), 2000);
-    } catch (err) {
-      console.error('Copy Error:', err);
-    }
+    } catch (err) { console.error('Copy Error:', err); }
   };
 
   const handleAddItem = (product) => {
@@ -100,34 +87,63 @@ const ScanPage = () => {
     clearSearch();
   };
 
-  // --- LOGIKA SCAN (Langsung DB) ---
-  const handleScan = async (sku) => {
-    playBeep();
-    setLoading(true);
-    clearSearch(); 
-    try {
-      // 1. Cek DB langsung
-      const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
-      
-      if (data) { 
-         setProductData(data);
-         // Update local state jika belum ada (opsional, biar sync)
-         setAllProducts(prev => {
-             if (!prev.find(p => p.id === data.id)) return [...prev, data];
-             return prev;
-         });
-      } else { 
-         setPendingSku(sku); 
-         setShowAddModal(true); 
+  // --- FUNGSI PENCARIAN INTI (REUSABLE) ---
+  const executeSearch = async (queryText) => {
+      const query = queryText.trim();
+      if (!query) return;
+
+      setLoading(true);
+      setIsSearching(true);
+
+      try {
+        // Cari yang MIRIP (ilike), jadi 1234 akan menemukan 1234A, 1234B, dll.
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) 
+          .limit(20);
+
+        if (error) throw error;
+        
+        // Urutkan: Jika ada yang SKU-nya SAMA PERSIS dengan query, taruh paling atas
+        const sortedData = (data || []).sort((a, b) => {
+            const aExact = a.sku.toLowerCase() === query.toLowerCase();
+            const bExact = b.sku.toLowerCase() === query.toLowerCase();
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+            return 0;
+        });
+
+        setSearchResults(sortedData);
+      } catch (error) {
+        console.error("Search Error:", error.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) { 
-      console.error(error); 
-    } finally { 
-      setLoading(false); 
-    }
   };
 
-  // --- LOGIKA SIMPAN PRODUK ---
+  // --- LOGIKA SCAN (UBAH JADI SEARCH) ---
+  const handleScan = async (sku) => {
+    playBeep();
+    
+    // 1. Masukkan hasil scan ke kolom search
+    setSearchQuery(sku);
+    
+    // 2. Jalankan pencarian (bukan langsung buka modal)
+    // Ini akan menampilkan list produk: 1234, 1234A, 1234B, dll.
+    await executeSearch(sku);
+  };
+
+  // --- LOGIKA SEARCH MANUAL (TOMBOL) ---
+  const handleSearch = async (e) => {
+      e.preventDefault();
+      await executeSearch(searchQuery);
+  };
+
+  const clearSearch = () => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); };
+  const handleItemClick = (item) => { setProductData(item); };
+
+  // --- LOGIKA SIMPAN ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
     if(!user) return alert("Sesi habis");
     setLoading(true);
@@ -142,8 +158,7 @@ const ScanPage = () => {
         brand_name: formData.brand_name || '-',
         variant_name: formData.variant_name,
         price: parseFloat(formData.price) || 0,
-        wholesale_price: parseFloat(formData.wholesale_price) || 0,
-        unit: formData.unit || 'Pcs'
+        wholesale_price: parseFloat(formData.wholesale_price) || 0
     };
 
     if (isUpdate) {
@@ -169,8 +184,10 @@ const ScanPage = () => {
                 setSearchResults(prev => prev.map(p => p.id === data.id ? data : p));
             } else {
                 setAllProducts(prev => [...prev, data]);
+                // Jika baru ditambah, kita bisa pilih mau langsung buka modal atau list
+                // Di sini saya buat update list pencarian saja agar konsisten
+                setSearchResults(prev => [data, ...prev]);
             }
-            setProductData(data); 
         }
     }
   };
@@ -179,42 +196,6 @@ const ScanPage = () => {
       setProductData(null); 
       setProductFormDefault(productToEdit); 
       setShowAddModal(true); 
-  };
-  
-  // --- LOGIKA SEARCH (LANGSUNG KE DATABASE SUPABASE) ---
-  const handleSearch = async (e) => {
-      e.preventDefault();
-      const query = searchQuery.trim();
-      
-      if (!query) return;
-
-      setLoading(true);
-      setIsSearching(true);
-
-      try {
-        // Query menggunakan ILIKE (Case Insensitive)
-        // Mencari di item_name ATAU sku
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) 
-          .limit(20); // Batasi 20 hasil agar cepat
-
-        if (error) throw error;
-        
-        setSearchResults(data || []);
-      } catch (error) {
-        console.error("Search Error:", error.message);
-        alert("Gagal mencari data.");
-      } finally {
-        setLoading(false);
-      }
-  };
-
-  const clearSearch = () => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); };
-
-  const handleItemClick = (item) => {
-      setProductData(item); 
   };
 
   return (
@@ -234,7 +215,6 @@ const ScanPage = () => {
           {searchQuery && (
             <div className="absolute right-3 top-2 flex items-center gap-2">
                  <button type="button" onClick={clearSearch} className="text-gray-400 p-1"><X size={20} /></button>
-                 {/* Tombol Search Wajib diklik / Enter untuk trigger search DB */}
                  <button type="submit" className="bg-blue-600 text-white p-1.5 rounded-md"><Search size={16}/></button>
              </div>
           )}
@@ -273,7 +253,6 @@ const ScanPage = () => {
                           <div className="flex flex-wrap gap-1">
                             {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
                             {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
-                            {item.unit && <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-green-100 font-medium">{item.unit}</span>}
                           </div>
                         </div>
                         <button 
@@ -292,7 +271,7 @@ const ScanPage = () => {
                     
                     {searchResults.length === 0 && !loading && (
                         <div className="text-center py-10">
-                            <p className="text-gray-400">Produk tidak ditemukan di Database.</p>
+                            <p className="text-gray-400">Produk tidak ditemukan.</p>
                             <button 
                                 onClick={() => {
                                     setPendingSku(searchQuery); 
@@ -365,7 +344,6 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* --- MODAL 1: CREATE / EDIT PRODUCT (Master Data) --- */}
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} 
@@ -375,7 +353,6 @@ const ScanPage = () => {
         setIsScannerActive={setIsCameraActive} 
       />
 
-      {/* --- MODAL 2: RESULT & ADD TO LIST --- */}
       <ProductResultModal 
         isOpen={!!productData} 
         onClose={() => setProductData(null)}
