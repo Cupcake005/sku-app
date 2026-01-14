@@ -7,8 +7,8 @@ import { useAuth } from '../AuthProvider';
 
 // KOMPONEN:
 import Scanner from '../components/Scanner'; 
-import ProductModal from '../components/ProductModal'; // Modal Tambah Baru (Master Data)
-import ProductResultModal from '../components/ProductResultModal'; // Modal Hasil Scan (Edit Harga Transaksi)
+import ProductModal from '../components/ProductModal'; // Modal Tambah/Edit (Master Data)
+import ProductResultModal from '../components/ProductResultModal'; // Modal Hasil Scan
 
 const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
 
@@ -20,14 +20,14 @@ const ScanPage = () => {
   const [loading, setLoading] = useState(false);
   
   // State Data
-  const [productData, setProductData] = useState(null); // Jika ini terisi, Modal Result Muncul
-  const [pendingSku, setPendingSku] = useState('');     // Jika terisi, Modal Tambah Baru Muncul
+  const [productData, setProductData] = useState(null); 
+  const [pendingSku, setPendingSku] = useState('');     
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // [BARU] State untuk template data saat Edit/Tambah Varian
-  const [productFormDefault, setProductFormDefault] = useState(null);
+  // State untuk Edit/Tambah Varian
+  const [productFormDefault, setProductFormDefault] = useState(null); 
 
-  // [BARU] Database Lokal untuk deteksi varian
+  // Database Lokal (Tetap diambil untuk keperluan deteksi varian di dalam Modal)
   const [allProducts, setAllProducts] = useState([]);
 
   // Scanner State
@@ -40,10 +40,11 @@ const ScanPage = () => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
 
-  // --- 1. FETCH ALL PRODUCTS (Agar Modal bisa baca varian) ---
+  // --- 1. FETCH ALL PRODUCTS (Background process untuk Varian) ---
   useEffect(() => {
     const fetchAllProducts = async () => {
       try {
+        // Ambil semua data untuk kebutuhan deteksi varian "saudara" di modal
         const { data, error } = await supabase.from('products').select('*');
         if (error) throw error;
         if (data) setAllProducts(data);
@@ -71,7 +72,6 @@ const ScanPage = () => {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(sku);
       } else {
-        // Fallback copy manual
         const textArea = document.createElement("textarea");
         textArea.value = sku;
         textArea.style.position = "fixed";
@@ -89,44 +89,36 @@ const ScanPage = () => {
     }
   };
 
-  // --- LOGIKA ADD ITEM KE LIST (Dipanggil dari Modal Result) ---
   const handleAddItem = (product) => {
     const isDuplicate = exportList.some((item) => item.sku === product.sku);
     if (isDuplicate) {
       alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
       return; 
     }
-    
-    // Langsung kirim product ke ExportContext
     addToExportList(product);
-    
-    // Tutup Modal & Reset
     setProductData(null); 
     clearSearch();
   };
 
-  // --- LOGIKA SCAN ---
+  // --- LOGIKA SCAN (Langsung DB) ---
   const handleScan = async (sku) => {
     playBeep();
     setLoading(true);
     clearSearch(); 
     try {
-      // Optimasi: Cek di local state dulu
-      const localProduct = allProducts.find(p => p.sku === sku);
+      // 1. Cek DB langsung
+      const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
       
-      if (localProduct) {
-         setProductData(localProduct);
-      } else {
-         // Fallback ke DB
-         const { data } = await supabase.from('products').select('*').eq('sku', sku).single();
-         
-         if (data) { 
-            setProductData(data);
-            setAllProducts(prev => [...prev, data]);
-         } else { 
-            setPendingSku(sku); 
-            setShowAddModal(true); 
-         }
+      if (data) { 
+         setProductData(data);
+         // Update local state jika belum ada (opsional, biar sync)
+         setAllProducts(prev => {
+             if (!prev.find(p => p.id === data.id)) return [...prev, data];
+             return prev;
+         });
+      } else { 
+         setPendingSku(sku); 
+         setShowAddModal(true); 
       }
     } catch (error) { 
       console.error(error); 
@@ -135,12 +127,11 @@ const ScanPage = () => {
     }
   };
 
-  // --- LOGIKA SIMPAN PRODUK (HANDLE INSERT & UPDATE) ---
+  // --- LOGIKA SIMPAN PRODUK ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
     if(!user) return alert("Sesi habis");
     setLoading(true);
     
-    // Cek apakah Edit (Update) atau Baru (Insert)
     const isUpdate = !isVariantMode && productFormDefault && productFormDefault.id;
     let error, data;
 
@@ -156,20 +147,11 @@ const ScanPage = () => {
     };
 
     if (isUpdate) {
-        // UPDATE
-        const res = await supabase.from('products')
-            .update(payload)
-            .eq('id', productFormDefault.id)
-            .select().single();
-        error = res.error;
-        data = res.data;
+        const res = await supabase.from('products').update(payload).eq('id', productFormDefault.id).select().single();
+        error = res.error; data = res.data;
     } else {
-        // INSERT
-        const res = await supabase.from('products')
-            .insert([{ ...payload, user_id: user.id }])
-            .select().single();
-        error = res.error;
-        data = res.data;
+        const res = await supabase.from('products').insert([{ ...payload, user_id: user.id }]).select().single();
+        error = res.error; data = res.data;
     }
 
     setLoading(false);
@@ -181,7 +163,6 @@ const ScanPage = () => {
         setShowAddModal(false); 
         setProductFormDefault(null); 
 
-        // Update State Lokal
         if (data) {
             if (isUpdate) {
                 setAllProducts(prev => prev.map(p => p.id === data.id ? data : p));
@@ -189,61 +170,45 @@ const ScanPage = () => {
             } else {
                 setAllProducts(prev => [...prev, data]);
             }
-            // Buka kembali modal result dengan data terbaru
             setProductData(data); 
         }
     }
   };
 
-  // --- LOGIKA EDIT MASTER / TAMBAH VARIAN ---
   const handleEditMaster = (productToEdit) => {
-      setProductData(null); // Tutup modal result
-      setProductFormDefault(productToEdit); // Isi template form
-      setShowAddModal(true); // Buka modal master
+      setProductData(null); 
+      setProductFormDefault(productToEdit); 
+      setShowAddModal(true); 
   };
   
-  // --- LOGIKA SEARCH (Local Filter) ---
-  // --- LOGIKA SEARCH (HYBRID: LOCAL + DB FALLBACK) ---
+  // --- LOGIKA SEARCH (LANGSUNG KE DATABASE SUPABASE) ---
   const handleSearch = async (e) => {
       e.preventDefault();
-      const query = searchQuery.toLowerCase().trim();
+      const query = searchQuery.trim();
       
       if (!query) return;
 
       setLoading(true);
       setIsSearching(true);
 
-      // 1. Coba cari di local state dulu (allProducts)
-      let results = allProducts.filter(item => {
-          const name = (item.item_name || '').toLowerCase();
-          const sku = (item.sku || '').toLowerCase();
-          const barcode = (item.barcode || '').toLowerCase(); // Tambah support barcode
-          return name.includes(query) || sku.includes(query) || barcode.includes(query);
-      });
+      try {
+        // Query menggunakan ILIKE (Case Insensitive)
+        // Mencari di item_name ATAU sku
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) 
+          .limit(20); // Batasi 20 hasil agar cepat
 
-      // 2. Jika hasil lokal sedikit (< 5) atau kosong, cari ke Database Supabase
-      // Ini penting jika allProducts belum memuat semua data (misal pagination)
-      if (results.length < 5) {
-          try {
-              const { data, error } = await supabase
-                  .from('products')
-                  .select('*')
-                  .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%,barcode.eq.${query}`) // Case insensitive search
-                  .limit(20);
-              
-              if (!error && data) {
-                  // Gabungkan hasil DB dengan hasil lokal (hindari duplikat)
-                  const existingIds = new Set(results.map(r => r.id));
-                  const newItems = data.filter(d => !existingIds.has(d.id));
-                  results = [...results, ...newItems];
-              }
-          } catch (err) {
-              console.error("Search DB Error:", err);
-          }
+        if (error) throw error;
+        
+        setSearchResults(data || []);
+      } catch (error) {
+        console.error("Search Error:", error.message);
+        alert("Gagal mencari data.");
+      } finally {
+        setLoading(false);
       }
-
-      setSearchResults(results);
-      setLoading(false);
   };
 
   const clearSearch = () => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); };
@@ -267,7 +232,11 @@ const ScanPage = () => {
           />
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
           {searchQuery && (
-            <button type="button" onClick={clearSearch} className="absolute right-3 top-3.5 text-gray-400"><X size={20} /></button>
+            <div className="absolute right-3 top-2 flex items-center gap-2">
+                 <button type="button" onClick={clearSearch} className="text-gray-400 p-1"><X size={20} /></button>
+                 {/* Tombol Search Wajib diklik / Enter untuk trigger search DB */}
+                 <button type="submit" className="bg-blue-600 text-white p-1.5 rounded-md"><Search size={16}/></button>
+             </div>
           )}
         </form>
       </div>
@@ -277,46 +246,66 @@ const ScanPage = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
                <h3 className="font-bold text-gray-700">Hasil Pencarian ({searchResults.length})</h3>
-               <button onClick={clearSearch} className="text-l text-white rounded-lg bg-black px-4 py-2">Tutup</button>
+               <button onClick={clearSearch} className="text-sm text-white rounded-lg bg-gray-800 px-3 py-1">Tutup</button>
             </div>
-             <div className="space-y-3">
-                {searchResults.map((item) => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => handleItemClick(item)} 
-                    className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition active:scale-[0.98]"
-                  >
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-800">{item.item_name}</div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="text-xs text-gray-500">{item.sku}</div>
+             
+             {loading ? (
+                 <div className="text-center py-10 text-gray-500 animate-pulse">Mencari di Database...</div>
+             ) : (
+                 <div className="space-y-3 pb-20">
+                    {searchResults.map((item) => (
+                      <div 
+                        key={item.id} 
+                        onClick={() => handleItemClick(item)} 
+                        className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition active:scale-[0.98]"
+                      >
+                        <div className="flex-1">
+                          <div className="font-bold text-gray-800">{item.item_name}</div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="text-xs text-gray-500 font-mono bg-gray-100 px-1 rounded">{item.sku}</div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
+                                className="text-gray-400 hover:text-blue-600 transition p-1"
+                            >
+                                {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
+                            {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
+                            {item.unit && <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-green-100 font-medium">{item.unit}</span>}
+                          </div>
+                        </div>
                         <button 
-                            onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
-                            className="text-gray-400 hover:text-blue-600 transition p-1 bg-gray-50 rounded"
+                            onClick={(e) => {
+                                e.stopPropagation(); 
+                                addToExportList(item); 
+                                clearSearch();
+                            }} 
+                            className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
+                            title="Quick Add"
                         >
-                            {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                            <Plus size={20} />
                         </button>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
-                        {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
-                      </div>
-                    </div>
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation(); 
-                            addToExportList(item); 
-                            clearSearch();
-                        }} 
-                        className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
-                        title="Quick Add (Tanpa Edit)"
-                    >
-                        <Plus size={20} />
-                    </button>
-                  </div>
-                ))}
-                {searchResults.length === 0 && <p className="text-center text-gray-400 mt-4">Tidak ditemukan.</p>}
-             </div>
+                    ))}
+                    
+                    {searchResults.length === 0 && !loading && (
+                        <div className="text-center py-10">
+                            <p className="text-gray-400">Produk tidak ditemukan di Database.</p>
+                            <button 
+                                onClick={() => {
+                                    setPendingSku(searchQuery); 
+                                    setShowAddModal(true);
+                                }}
+                                className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                            >
+                                + Tambah Produk Baru "{searchQuery}"
+                            </button>
+                        </div>
+                    )}
+                 </div>
+             )}
           </div>
         ) : (
           <>
@@ -380,20 +369,18 @@ const ScanPage = () => {
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} 
-        // Logic: Jika ada productFormDefault (dari edit), pakai itu. Jika tidak, pakai sku pending (dari scan baru)
         product={productFormDefault || { sku: pendingSku }} 
         onSave={handleSaveProduct}
-        allProducts={allProducts} // Kirim data untuk cek duplikat/varian di dalam modal
+        allProducts={allProducts} 
+        setIsScannerActive={setIsCameraActive} 
       />
 
-      {/* --- MODAL 2: RESULT & ADD TO LIST (Untuk Edit Harga Transaksi) --- */}
+      {/* --- MODAL 2: RESULT & ADD TO LIST --- */}
       <ProductResultModal 
         isOpen={!!productData} 
         onClose={() => setProductData(null)}
         product={productData}
         onAddToExport={handleAddItem}
-        
-        // Props tambahan untuk fitur varian & edit
         allProducts={allProducts} 
         setIsScannerActive={setIsCameraActive} 
         onEditMaster={handleEditMaster} 
