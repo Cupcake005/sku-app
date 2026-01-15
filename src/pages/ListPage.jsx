@@ -212,12 +212,15 @@ const ListPage = () => {
 
   // --- STATE UNTUK MODAL ---
   const [modalConfig, setModalConfig] = useState({
-    isOpen: false,
-    type: null, // 'DELETE_ALL' atau 'DELETE_ONE'
-    id: null,
-    name: ''
-  });
-
+      isOpen: false,
+      type: null,
+      id: null,
+      name: '',
+      title: '',
+      message: '',
+      confirmLabel: '', // Tambahan
+      isDanger: false   // Tambahan
+    });
   // --- HANDLER PEMICU MODAL ---
   
   // 1. Klik Hapus Semua
@@ -227,10 +230,11 @@ const ListPage = () => {
         isOpen: true,
         type: 'DELETE_ALL',
         title: 'Hapus Semua Barang?',
-        message: 'Tindakan ini akan mengosongkan seluruh list export Anda. Data tidak bisa dikembalikan.'
+        message: 'Tindakan ini akan mengosongkan seluruh list export Anda. Data tidak bisa dikembalikan.',
+        confirmLabel: 'Hapus Semua', // Teks Tombol
+        isDanger: true // Warna Merah
     });
   };
-
   // 2. Klik Hapus Satu Item
   const triggerDeleteItem = (id, name) => {
     setModalConfig({
@@ -239,7 +243,9 @@ const ListPage = () => {
         id: id,
         name: name,
         title: 'Hapus Barang?',
-        message: `Apakah Anda yakin ingin menghapus "${name}" dari list?`
+        message: `Apakah Anda yakin ingin menghapus "${name}" dari list?`,
+        confirmLabel: 'Ya, Hapus', // Teks Tombol
+        isDanger: true // Warna Merah
     });
   };
 
@@ -250,9 +256,7 @@ const ListPage = () => {
     } else if (modalConfig.type === 'DELETE_ONE') {
         removeFromExportList(modalConfig.id);
     }
-    
-    // Tutup Modal
-    setModalConfig({ isOpen: false, type: null, id: null, name: '' });
+    setModalConfig({ ...modalConfig, isOpen: false });
   };
 
   // --- LOGIKA DOWNLOAD (TETAP SAMA) ---
@@ -421,12 +425,22 @@ const ListPage = () => {
       )}
 
       {/* --- RENDER CONFIRMATION MODAL --- */}
+      {/* <ConfirmationModal 
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={handleConfirmAction}
+        title={modalConfig.title}
+        message={modalConfig.message}
+      /> */}
       <ConfirmationModal 
         isOpen={modalConfig.isOpen}
         onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
         onConfirm={handleConfirmAction}
         title={modalConfig.title}
         message={modalConfig.message}
+        // Kirim props baru:
+        confirmLabel={modalConfig.confirmLabel}
+        isDanger={modalConfig.isDanger}
       />
 
     </div>
