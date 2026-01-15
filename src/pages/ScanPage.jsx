@@ -773,10 +773,7 @@ import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal'; 
 import ProductResultModal from '../components/ProductResultModal';
 import ConfirmationModal from '../components/ConfirmationModal'; 
-import NotificationModal from '../components/NotificationModal'; // 1. IMPORT MODAL NOTIFIKASI
-
-// AUDIO BEEP
-const beepSound = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVDWHZ+gImbfnOEiId9YE9KZYCNmn1tS1R0gIqWemhLVXOAhpV6aUpVdICGlXppSlV0gIaVemlKVXSxhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGlXppSlVzgIaVemlKVXOAhpV6aUpVc4CGl");
+import NotificationModal from '../components/NotificationModal'; 
 
 const ScanPage = () => {
   const { user } = useAuth();
@@ -792,27 +789,11 @@ const ScanPage = () => {
   const [productFormDefault, setProductFormDefault] = useState(null); 
   const [allProducts, setAllProducts] = useState([]);
 
-  // --- STATE MODAL KONFIRMASI (CONFIRMATION) ---
+  // --- STATE MODAL & NOTIFIKASI ---
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingUpdateProduct, setPendingUpdateProduct] = useState(null);
   const [existingProductData, setExistingProductData] = useState(null);
-
-  // --- 2. STATE MODAL NOTIFIKASI (ALERT REPLACEMENT) ---
-  const [notifyModal, setNotifyModal] = useState({
-    isOpen: false,
-    type: 'success', // success, error, info
-    title: '',
-    message: ''
-  });
-
-  // HELPER UNTUK MEMUNCULKAN NOTIFIKASI
-  const showNotify = (type, title, message) => {
-    setNotifyModal({ isOpen: true, type, title, message });
-  };
-
-  const closeNotify = () => {
-    setNotifyModal({ ...notifyModal, isOpen: false });
-  };
+  const [notifyModal, setNotifyModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
   // Scanner State
   const [isCameraActive, setIsCameraActive] = useState(() => {
@@ -823,6 +804,56 @@ const ScanPage = () => {
   useEffect(() => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
+
+  // --- 1. TEKNIK AUDIO "BEEP" YANG LEBIH KUAT (WEB AUDIO API) ---
+  // Ini membangkitkan suara digital (Oscillator) tanpa butuh file mp3/wav
+  const triggerBeep = () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return; // Jika browser jadul banget
+
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'square'; // Tipe suara 'tet' kotak (khas scanner)
+        osc.frequency.setValueAtTime(1500, ctx.currentTime); // Frekuensi tinggi (1500Hz)
+        gain.gain.setValueAtTime(0.1, ctx.currentTime); // Volume 10% biar gak kaget
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1); // Bunyi selama 0.1 detik (100ms)
+        
+        // Bersihkan memory setelah bunyi selesai
+        setTimeout(() => {
+            ctx.close();
+        }, 150);
+
+    } catch (e) {
+        console.error("Gagal memutar beep:", e);
+    }
+  };
+
+  // --- 2. FUNGSI UNTUK MEMBUKA KUNCI AUDIO ---
+  // Browser memblokir suara jika user belum klik apa-apa.
+  // Panggil ini saat tombol "Hidupkan Kamera" ditekan.
+  const unlockAudioContext = () => {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+          const ctx = new AudioContext();
+          ctx.resume().then(() => ctx.close());
+      }
+  };
+
+  const showNotify = (type, title, message) => {
+    setNotifyModal({ isOpen: true, type, title, message });
+  };
+
+  const closeNotify = () => {
+    setNotifyModal({ ...notifyModal, isOpen: false });
+  };
 
   // --- FETCH ALL PRODUCTS ---
   useEffect(() => {
@@ -849,12 +880,6 @@ const ScanPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [copiedSku, setCopiedSku] = useState(null);
 
-  // --- PLAY BEEP FUNCTION ---
-  const playBeep = () => { 
-      beepSound.currentTime = 0; 
-      beepSound.play().catch(e => console.log("Gagal memutar audio:", e)); 
-  };
-
   const handleCopySku = async (sku) => {
     if (!sku || sku === '-') return;
     try {
@@ -864,7 +889,6 @@ const ScanPage = () => {
     } catch (err) { console.error('Copy Error:', err); }
   };
 
-  // --- 3. UPDATE LOGIKA ADD ITEM ---
   const handleAddItem = (product) => {
     const existingItem = exportList.find((item) => item.sku === product.sku);
     
@@ -874,12 +898,10 @@ const ScanPage = () => {
           existingItem.wholesale_price !== product.wholesale_price;
 
       if (isPriceChanged) {
-          // Buka Modal Konfirmasi
           setExistingProductData(existingItem); 
           setPendingUpdateProduct(product);     
           setShowConfirmModal(true);            
       } else {
-          // Ganti Alert Browser dengan Modal Notifikasi
           showNotify('info', 'Produk Duplikat', `Produk "${product.item_name}" sudah ada di list dengan harga yang sama!`);
       }
       return; 
@@ -890,13 +912,10 @@ const ScanPage = () => {
     clearSearch();
   };
 
-  // --- FUNGSI EKSEKUSI UPDATE ---
   const executeUpdate = () => {
       if (pendingUpdateProduct) {
           updateExportItem(pendingUpdateProduct);
-          // Ganti Alert Browser dengan Modal Notifikasi
           showNotify('success', 'Berhasil Update', 'Harga produk dalam list berhasil diperbarui!');
-          
           setShowConfirmModal(false);
           setPendingUpdateProduct(null);
           setExistingProductData(null);
@@ -905,7 +924,6 @@ const ScanPage = () => {
       }
   };
 
-  // --- FUNGSI PENCARIAN INTI ---
   const executeSearch = async (queryText) => {
       const query = queryText.trim();
       if (!query) return;
@@ -939,7 +957,7 @@ const ScanPage = () => {
   };
 
   const handleScan = async (sku) => {
-    playBeep();
+    triggerBeep(); // Panggil fungsi beep baru
     setSearchQuery(sku);
     await executeSearch(sku);
   };
@@ -952,7 +970,6 @@ const ScanPage = () => {
   const clearSearch = () => { setSearchQuery(''); setSearchResults([]); setIsSearching(false); };
   const handleItemClick = (item) => { setProductData(item); };
 
-  // --- LOGIKA SIMPAN ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
     if(!user) return showNotify('error', 'Sesi Habis', 'Silakan login ulang.');
     setLoading(true);
@@ -981,12 +998,9 @@ const ScanPage = () => {
     setLoading(false);
 
     if (error) {
-        // Ganti Alert Error
         showNotify('error', 'Gagal Menyimpan', error.message);
     } else {
-        // Ganti Alert Sukses
         showNotify('success', 'Berhasil', isUpdate ? 'Produk berhasil diperbarui!' : 'Produk baru berhasil ditambahkan!');
-        
         setShowAddModal(false); 
         setProductFormDefault(null); 
 
@@ -1011,7 +1025,6 @@ const ScanPage = () => {
   return (
     <div className="pb-24 max-w-md mx-auto relative min-h-screen"> 
       
-      {/* --- RENDER NOTIFICATION MODAL (Pengganti Alert) --- */}
       <NotificationModal 
         isOpen={notifyModal.isOpen}
         onClose={closeNotify}
@@ -1078,7 +1091,6 @@ const ScanPage = () => {
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation(); 
-                                // Pakai handleAddItem
                                 handleAddItem(item); 
                             }} 
                             className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
@@ -1122,7 +1134,10 @@ const ScanPage = () => {
 
             <div className="grid grid-cols-2 gap-3 mt-4 max-w-xs mx-auto">
                 <button 
-                    onClick={() => setIsCameraActive(!isCameraActive)}
+                    onClick={() => {
+                        setIsCameraActive(!isCameraActive);
+                        if(!isCameraActive) unlockAudioContext(); // PANCING AUDIO SAAT KAMERA HIDUP
+                    }}
                     className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${
                         isCameraActive ? 'bg-gray-800' : 'bg-green-600'
                     }`}
@@ -1162,7 +1177,7 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* --- RENDER MODAL KONFIRMASI (Untuk Update Harga) --- */}
+      {/* --- RENDER MODAL KONFIRMASI --- */}
       <ConfirmationModal 
         isOpen={showConfirmModal}
         onClose={() => {
