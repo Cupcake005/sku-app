@@ -1,3 +1,4 @@
+
 // import React, { useState, useEffect, useRef } from 'react';
 // import { useSearchParams } from 'react-router-dom';
 // import { supabase } from '../supabaseClient';
@@ -15,7 +16,7 @@
   
 //   // --- STATE MODAL & SCANNER ---
 //   const [isModalOpen, setIsModalOpen] = useState(false);
-//   const [currentProduct, setCurrentProduct] = useState(null); // null = Mode Tambah
+//   const [currentProduct, setCurrentProduct] = useState(null); 
 //   const [showScanner, setShowScanner] = useState(false);
 //   const fileInputRef = useRef(null);
 
@@ -32,20 +33,21 @@
 //     }
 //   }, [searchParams, user]);
 
-//   // --- 2. FETCH DATA (CHUNK LOOP - BYPASS 1000 LIMIT) ---
+//   // --- 2. FETCH DATA ---
 //   const fetchProducts = async () => {
+//     if (!user) return;
 //     setLoading(true);
 //     try {
 //         let allData = [];
 //         let from = 0;
-//         const step = 1000; // Ambil per 1000 baris
+//         const step = 1000; 
 //         let more = true;
 
 //         while (more) {
 //             const { data, error } = await supabase
 //                 .from('products')
 //                 .select('*')
-//                 .eq('user_id', user.id) // Filter by User ID
+//                 .eq('user_id', user.id) 
 //                 .order('created_at', { ascending: false })
 //                 .range(from, from + step - 1);
 
@@ -54,7 +56,7 @@
 //             if (data && data.length > 0) {
 //                 allData = [...allData, ...data];
 //                 from += step;
-//                 if (data.length < step) more = false; // Data habis
+//                 if (data.length < step) more = false; 
 //             } else {
 //                 more = false;
 //             }
@@ -68,43 +70,36 @@
 //     }
 //   };
 
-//   // --- 3. SAVE PRODUCT (CREATE, UPDATE & VARIANT) ---
+//   // --- 3. SAVE PRODUCT (MANUAL) ---
 //   const handleSaveProduct = async (formData, isVariantMode = false) => {
 //     if (!user) return alert("Sesi habis. Silakan login ulang.");
 //     setLoading(true);
     
-//     // Logika Update: HANYA JIKA bukan mode varian, ada produk, dan ada ID
 //     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
-
 //     let error;
 
+//     // HAPUS UNIT DARI PAYLOAD AGAR TIDAK ERROR
 //     const payload = {
 //         sku: formData.sku,
 //         item_name: formData.item_name,
 //         category: formData.category,
-//         brand_name: formData.brand_name,
+//         brand_name: formData.brand_name || '-',
 //         variant_name: formData.variant_name,
-//         price: parseFloat(formData.price),
-//         wholesale_price: parseFloat(formData.wholesale_price) || 0,
-//         unit: formData.unit || 'Pcs'
+//         price: parseFloat(formData.price) || 0,
+//         wholesale_price: parseFloat(formData.wholesale_price) || 0
 //     };
 
 //     if (isUpdate) {
-//       // --- UPDATE (Edit Data Lama) ---
 //       const { error: err } = await supabase
 //         .from('products')
 //         .update(payload)
 //         .eq('id', currentProduct.id)
-//         .eq('user_id', user.id);
+//         .eq('user_id', user.id); 
 //       error = err;
 //     } else {
-//       // --- CREATE (Data Baru / Varian Baru) ---
 //       const { error: err } = await supabase
 //         .from('products')
-//         .insert([{
-//           ...payload,
-//           user_id: user.id // Bind ke User
-//         }]);
+//         .insert([{ ...payload, user_id: user.id }]);
 //       error = err;
 //     }
 
@@ -127,39 +122,43 @@
 
 //   // --- 4. HAPUS DATA ---
 //   const handleDelete = async (id, name) => {
+//     if (!user) return;
 //     if (window.confirm(`Yakin hapus "${name}"?`)) {
-//       const { error } = await supabase.from('products').delete().eq('id', id).eq('user_id', user.id);
+//       const { error } = await supabase
+//         .from('products')
+//         .delete()
+//         .eq('id', id)
+//         .eq('user_id', user.id);
+
 //       if (error) alert('Gagal hapus: ' + error.message);
 //       else setProducts(products.filter(item => item.id !== id));
 //     }
 //   };
 
-//   // --- 5. MODAL CONTROL ---
-//   const handleOpenAdd = () => {
-//     setCurrentProduct(null);
-//     setIsModalOpen(true);
-//   };
+//   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
+//   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-//   const handleOpenEdit = (item) => {
-//     setCurrentProduct(item);
-//     setIsModalOpen(true);
-//   };
-
-//   // --- 6. EXPORT CSV (UPDATE: TAMBAH KOLOM GROSIR) ---
+//   // --- 5. EXPORT CSV (SESUAIKAN DENGAN GAMBAR EXCEL) ---
 //   const handleExport = () => { 
 //       if (products.length === 0) return alert("Data kosong!");
-//       const header = "Category,SKU,Unit,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+      
+//       // Header disesuaikan dengan gambar Excel Anda (7 Kolom)
+//       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+      
 //       const rows = products.map(item => {
 //         const category = `"${item.category || ''}"`;
 //         const sku = `"${item.sku || ''}"`; 
-//         const unit = `"${item.unit || ''}"`;
-//         const name = `"${item.item_name || ''}"`;
+//         // Kolom Unit DIHAPUS agar sesuai gambar
+//         const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
 //         const brand = `"${item.brand_name || ''}"`;
 //         const variant = `"${item.variant_name || ''}"`;
 //         const price = item.price || 0;
 //         const wholesale = item.wholesale_price || 0;
-//         return `${category},${sku},${unit},${name},${brand},${variant},${price},${wholesale}`;
+        
+//         // Urutan: Category, SKU, Name, Brand, Variant, Price, Wholesale
+//         return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
 //       });
+
 //       const csvContent = [header, ...rows].join("\n");
 //       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 //       const link = document.createElement("a");
@@ -171,7 +170,7 @@
 //       document.body.removeChild(link);
 //   };
 
-//   // --- 7. IMPORT CSV (UPDATE: TAMBAH KOLOM GROSIR) ---
+//   // --- 6. IMPORT CSV (SESUAIKAN PEMBACAAN KOLOM) ---
 //   const handleImportClick = () => { 
 //       if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
 //           fileInputRef.current.click(); 
@@ -205,23 +204,29 @@
 //             result.push(current.trim()); return result;
 //         };
 
+//         // Mulai loop (skip header baris 0)
 //         for (let i = 1; i < lines.length; i++) {
 //             const line = lines[i].trim(); if (!line) continue;
 //             const columns = parseCSVLine(line);
-//             if (columns.length >= 7) { // Adjusted for unit column
+            
+//             // Kita butuh minimal 7 kolom sesuai gambar Excel
+//             // 0:Category, 1:SKU, 2:Name, 3:Brand, 4:Variant, 5:Price, 6:Wholesale
+//             if (columns.length >= 6) { 
 //                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
+                
 //                 const category = clean(columns[0]); 
 //                 let sku = clean(columns[1]); 
-//                 const unit = clean(columns[2]);
-//                 const item_name = clean(columns[3]); 
-//                 const brand_name = clean(columns[4]); 
-//                 const variant_name = clean(columns[5]);
                 
-//                 let priceStr = clean(columns[6]).replace(/[^0-9.]/g, ''); 
+//                 // Urutan Baru sesuai gambar Excel:
+//                 const item_name = clean(columns[2]); // Kolom ke-3
+//                 const brand_name = clean(columns[3]); // Kolom ke-4
+//                 const variant_name = clean(columns[4]); // Kolom ke-5
+                
+//                 let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
 //                 const price = parseFloat(priceStr) || 0;
 
-//                 // Ambil harga grosir (kolom ke-8 jika ada)
-//                 let wholesaleStr = columns[7] ? clean(columns[7]).replace(/[^0-9.]/g, '') : '0';
+//                 // Ambil harga grosir (kolom ke-7 / index 6)
+//                 let wholesaleStr = columns[6] ? clean(columns[6]).replace(/[^0-9.]/g, '') : '0';
 //                 const wholesale_price = parseFloat(wholesaleStr) || 0;
                 
 //                 if (!sku) sku = "-";
@@ -231,19 +236,19 @@
 //                         user_id: user.id, 
 //                         category, 
 //                         sku: String(sku), 
-//                         unit: unit || 'Pcs',
+//                         // TIDAK ADA UNIT
 //                         item_name, 
 //                         brand_name, 
 //                         variant_name, 
 //                         price,
-//                         wholesale_price // Simpan ke DB
+//                         wholesale_price
 //                     }); 
 //                 }
 //             }
 //         }
 
 //         if (dataToInsert.length > 0) {
-//             // Hapus data lama milik user ini saja (aman karena RLS)
+//             // Hapus data lama milik user ini saja
 //             const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
 //             if (deleteError) throw deleteError;
 
@@ -263,7 +268,7 @@
 //       }
 //   };
 
-//   // --- 8. UI HELPERS ---
+//   // --- UI HELPERS ---
 //   const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
 //   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   
@@ -334,7 +339,6 @@
 //                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
 //                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
 //                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
-//                     {item.unit && <span className="bg-green-50 text-green-600 px-1.5 py-0.5 rounded text-[10px] border border-green-100 font-medium">{item.unit}</span>}
 //                   </div>
                   
 //                   {/* Info Harga */}
@@ -342,7 +346,6 @@
 //                       <div className="text-sm font-bold text-blue-600">
 //                         Rp {(item.price || 0).toLocaleString()}
 //                       </div>
-//                       {/* Tampilkan Label Grosir Jika Ada */}
 //                       {item.wholesale_price > 0 && (
 //                         <div className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-1 rounded">
 //                            Grosir: Rp {(item.wholesale_price).toLocaleString()}
@@ -371,7 +374,7 @@
 //         product={currentProduct}
 //         onSave={handleSaveProduct}
 //         onScanClick={() => { setIsModalOpen(false); setShowScanner(true); }} 
-//         allProducts={products} // Pass allProducts to modal!
+//         allProducts={products} 
 //       />
 
 //     </div>
@@ -380,14 +383,14 @@
 
 // export default ManagePage;
 
-
+//============================================================================
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthProvider'; 
 import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal';
-import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
+import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X } from 'lucide-react';
 
 const ManagePage = () => {
   const { user } = useAuth(); 
@@ -460,7 +463,6 @@ const ManagePage = () => {
     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
     let error;
 
-    // HAPUS UNIT DARI PAYLOAD AGAR TIDAK ERROR
     const payload = {
         sku: formData.sku,
         item_name: formData.item_name,
@@ -520,24 +522,21 @@ const ManagePage = () => {
   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-  // --- 5. EXPORT CSV (SESUAIKAN DENGAN GAMBAR EXCEL) ---
+  // --- 5. EXPORT CSV ---
   const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
       
-      // Header disesuaikan dengan gambar Excel Anda (7 Kolom)
       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
       
       const rows = products.map(item => {
         const category = `"${item.category || ''}"`;
         const sku = `"${item.sku || ''}"`; 
-        // Kolom Unit DIHAPUS agar sesuai gambar
         const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
         const brand = `"${item.brand_name || ''}"`;
         const variant = `"${item.variant_name || ''}"`;
         const price = item.price || 0;
         const wholesale = item.wholesale_price || 0;
         
-        // Urutan: Category, SKU, Name, Brand, Variant, Price, Wholesale
         return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
       });
 
@@ -552,7 +551,7 @@ const ManagePage = () => {
       document.body.removeChild(link);
   };
 
-  // --- 6. IMPORT CSV (SESUAIKAN PEMBACAAN KOLOM) ---
+  // --- 6. IMPORT CSV ---
   const handleImportClick = () => { 
       if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
           fileInputRef.current.click(); 
@@ -586,28 +585,22 @@ const ManagePage = () => {
             result.push(current.trim()); return result;
         };
 
-        // Mulai loop (skip header baris 0)
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
             const columns = parseCSVLine(line);
             
-            // Kita butuh minimal 7 kolom sesuai gambar Excel
-            // 0:Category, 1:SKU, 2:Name, 3:Brand, 4:Variant, 5:Price, 6:Wholesale
             if (columns.length >= 6) { 
                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
                 
                 const category = clean(columns[0]); 
                 let sku = clean(columns[1]); 
-                
-                // Urutan Baru sesuai gambar Excel:
-                const item_name = clean(columns[2]); // Kolom ke-3
-                const brand_name = clean(columns[3]); // Kolom ke-4
-                const variant_name = clean(columns[4]); // Kolom ke-5
+                const item_name = clean(columns[2]); 
+                const brand_name = clean(columns[3]); 
+                const variant_name = clean(columns[4]);
                 
                 let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
                 const price = parseFloat(priceStr) || 0;
 
-                // Ambil harga grosir (kolom ke-7 / index 6)
                 let wholesaleStr = columns[6] ? clean(columns[6]).replace(/[^0-9.]/g, '') : '0';
                 const wholesale_price = parseFloat(wholesaleStr) || 0;
                 
@@ -618,7 +611,6 @@ const ManagePage = () => {
                         user_id: user.id, 
                         category, 
                         sku: String(sku), 
-                        // TIDAK ADA UNIT
                         item_name, 
                         brand_name, 
                         variant_name, 
@@ -630,11 +622,9 @@ const ManagePage = () => {
         }
 
         if (dataToInsert.length > 0) {
-            // Hapus data lama milik user ini saja
             const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
             if (deleteError) throw deleteError;
 
-            // Insert data baru
             const { error: insertError } = await supabase.from('products').insert(dataToInsert);
             if (insertError) throw insertError;
             
@@ -650,14 +640,35 @@ const ManagePage = () => {
       }
   };
 
-  // --- UI HELPERS ---
-  const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
-  const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  // --- 8. UI HELPERS ---
+  const handleScanSearch = (sku) => { 
+      setSearchQuery(sku); 
+      setShowScanner(false); 
+      alert(`🔍 Mencari SKU: ${sku}`); 
+  };
   
-  const filteredProducts = products.filter(item => 
-    (item.item_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const clearSearch = () => { setSearchQuery(''); }; // Helper untuk tombol X
+
+  // --- LOGIKA FILTER PENCARIAN (DIPERBAIKI) ---
+  const filteredProducts = products.filter(item => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true; // Tampilkan semua jika kosong
+
+    // Ambil data (handle null dengan string kosong)
+    const name = (item.item_name || '').toLowerCase();
+    const sku = (item.sku || '').toLowerCase();
+    const brand = (item.brand_name || '').toLowerCase();
+    const variant = (item.variant_name || '').toLowerCase();
+    const category = (item.category || '').toLowerCase();
+
+    // Cek apakah query ada di salah satu kolom
+    return name.includes(query) || 
+           sku.includes(query) || 
+           brand.includes(query) || 
+           variant.includes(query) || 
+           category.includes(query);
+  });
 
   return (
     <div className="pb-24 relative">
@@ -701,10 +712,18 @@ const ManagePage = () => {
         <div className="relative mb-4">
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
           <input 
-            type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Nama atau SKU..."
+            type="text" 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari Nama, SKU, Brand, Varian..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
+          {/* Tombol Clear Search (X) jika ada teks */}
+          {searchQuery && (
+             <button onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
+                <X size={16} />
+             </button>
+          )}
           <button onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
         </div>
 
@@ -743,7 +762,7 @@ const ManagePage = () => {
                 </div>
               </div>
             ))}
-            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? "Barang tidak ditemukan." : "Data kosong."}</p>}
+            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada hasil untuk "${searchQuery}"` : "Data kosong."}</p>}
           </div>
         )}
       </div>
