@@ -312,13 +312,11 @@
 
 // export default ProductModal;
 
-
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { X, Save, Plus, ScanLine, Copy, Loader2 } from 'lucide-react';
+import { X, ScanLine } from 'lucide-react';
 
-const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
+const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick, setIsScannerActive }) => {
   const [formData, setFormData] = useState({
     sku: '',
     item_name: '',
@@ -326,16 +324,30 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
     brand_name: '',
     variant_name: '',
     price: '',
-    wholesale_price: '' // <--- TAMBAH STATE INI
+    wholesale_price: ''
   });
 
   const [isChecking, setIsChecking] = useState(false);
   const [isVariantMode, setIsVariantMode] = useState(false);
 
+  // --- 1. LOGIKA KAMERA (Matikan saat modal buka) ---
   useEffect(() => {
+    if (isOpen && setIsScannerActive) {
+        setIsScannerActive(false);
+    }
+    return () => {
+        if (setIsScannerActive) setIsScannerActive(true);
+    };
+  }, [isOpen, setIsScannerActive]);
+
+  // --- 2. LOGIKA INITIAL LOAD (PERBAIKAN UTAMA DISINI) ---
+  useEffect(() => {
+    // Hanya jalan saat modal DIBUKA (isOpen berubah jadi true)
     if (isOpen) {
       setIsVariantMode(false); 
+      
       if (product) {
+        // Mode Edit: Isi form dari data produk yang dikirim
         setFormData({
           sku: product.sku || '',
           item_name: product.item_name || '',
@@ -343,9 +355,10 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
           brand_name: product.brand_name || '',
           variant_name: product.variant_name || '',
           price: product.price || '',
-          wholesale_price: product.wholesale_price || '' // <--- LOAD DATA
+          wholesale_price: product.wholesale_price || '' 
         });
       } else {
+        // Mode Tambah: Reset form jadi kosong
         setFormData({
           sku: '',
           item_name: '',
@@ -353,11 +366,12 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
           brand_name: '',
           variant_name: '',
           price: '',
-          wholesale_price: '' // <--- RESET
+          wholesale_price: '' 
         });
       }
     }
-  }, [isOpen, product]);
+    // HAPUS 'product' DARI SINI AGAR TIDAK RESET SAAT NGETIK
+  }, [isOpen]); 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -375,18 +389,16 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
         brand_name: formData.brand_name.toUpperCase().trim(),
         variant_name: formData.variant_name.toUpperCase().trim(),
         price: formData.price,
-        wholesale_price: formData.wholesale_price // <--- KIRIM DATA
+        wholesale_price: formData.wholesale_price 
     };
 
-    // ... (Logika Validasi SKU sama seperti sebelumnya, dipersingkat di sini) ...
-    // LANGSUNG KE SAVE SAJA UNTUK SINGKATNYA (Logika validasi copy dari kode sebelumnya jika mau lengkap)
-    
     try {
         // Cek Duplikat Sederhana
         const skuToCheck = finalData.sku;
         if (skuToCheck && skuToCheck !== '-') {
              const { data: skuData } = await supabase.from('products').select('id, item_name').eq('sku', skuToCheck);
              let isDuplicate = skuData && skuData.length > 0;
+             // Jika sedang edit produk yang sama, jangan anggap duplikat
              if (!isVariantMode && product && skuData.length > 0 && skuData[0].id === product.id) isDuplicate = false;
              
              if (isDuplicate) {
@@ -409,19 +421,26 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
   const handleAutoVariant = async () => {
      const currentSku = formData.sku.toUpperCase().trim();
      if (!currentSku || currentSku === '-') return alert("Isi SKU dulu");
+     
      setIsChecking(true);
      const suffixes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; 
      let foundSku = "";
+     
      for (let i = 0; i < suffixes.length; i++) {
         const candidateSku = currentSku + suffixes[i];
         const { data } = await supabase.from('products').select('id').eq('sku', candidateSku); 
         if (data && data.length === 0) { foundSku = candidateSku; break; }
      }
+     
      setIsChecking(false);
+     
      if (foundSku) {
-        setFormData(prev => ({ ...prev, sku: foundSku, variant_name: '', price: '', wholesale_price: '' })); // Reset harga juga
+        // Saat bikin varian, harga di-reset agar user isi baru
+        setFormData(prev => ({ ...prev, sku: foundSku, variant_name: '', price: '', wholesale_price: '' })); 
         setIsVariantMode(true); 
-     } else { alert("Varian penuh!"); }
+     } else { 
+        alert("Varian penuh!"); 
+     }
   };
 
   if (!isOpen) return null;
@@ -430,49 +449,39 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 animate-fade-in max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div className="flex justify-between items-center mb-4 border-b pb-2">
           <h3 className="font-bold text-lg">{isVariantDisplay ? 'Tambah Varian' : (isEditMode ? 'Edit Produk' : 'Tambah Produk')}</h3>
           <button onClick={onClose}><X size={24} /></button>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* ... Input Nama, SKU, Kategori, Brand, Varian (SAMA SEPERTI SEBELUMNYA) ... */}
            <div>
             <label className="text-xs font-bold text-gray-500">Nama Barang *</label>
-            <input required name="item_name" className="w-full border p-2 rounded uppercase" value={formData.item_name} onChange={handleChange} />
+            <input required name="item_name" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.item_name} onChange={handleChange} />
           </div>
           <div>
-            <div className="flex justify-between"><label className="text-xs font-bold text-gray-500">SKU</label> {!isVariantMode && <button type="button" onClick={handleAutoVariant} className="text-[10px] text-purple-700 bg-purple-100 px-2 rounded">Buat Varian</button>}</div>
-            <div className="flex gap-2"><input name="sku" className="w-full border p-2 rounded uppercase" value={formData.sku} onChange={handleChange} /> {!isEditMode && !isVariantDisplay && <button type="button" onClick={onScanClick}><ScanLine/></button>}</div>
+            <div className="flex justify-between"><label className="text-xs font-bold text-gray-500">SKU</label> {!isVariantMode && <button type="button" onClick={handleAutoVariant} className="text-[10px] text-purple-700 bg-purple-100 px-2 rounded hover:bg-purple-200">Buat Varian</button>}</div>
+            <div className="flex gap-2"><input name="sku" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.sku} onChange={handleChange} /> {!isEditMode && !isVariantDisplay && <button type="button" onClick={onScanClick} className="bg-gray-100 p-2 rounded hover:bg-gray-200"><ScanLine size={20}/></button>}</div>
           </div>
            <div className="flex gap-2">
-            <div className="w-1/2"><label className="text-xs font-bold text-gray-500">Kategori</label><input name="category" className="w-full border p-2 rounded uppercase" value={formData.category} onChange={handleChange} /></div>
-            <div className="w-1/2"><label className="text-xs font-bold text-gray-500">Brand</label><input name="brand_name" className="w-full border p-2 rounded uppercase" value={formData.brand_name} onChange={handleChange} /></div>
+            <div className="w-1/2"><label className="text-xs font-bold text-gray-500">Kategori</label><input name="category" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.category} onChange={handleChange} /></div>
+            <div className="w-1/2"><label className="text-xs font-bold text-gray-500">Brand</label><input name="brand_name" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.brand_name} onChange={handleChange} /></div>
           </div>
-          <div><label className="text-xs font-bold text-gray-500">Varian</label><input name="variant_name" className="w-full border p-2 rounded uppercase" value={formData.variant_name} onChange={handleChange} /></div>
+          <div><label className="text-xs font-bold text-gray-500">Varian</label><input name="variant_name" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.variant_name} onChange={handleChange} /></div>
 
-          {/* --- BAGIAN HARGA (DIUPDATE) --- */}
           <div className="flex gap-2">
               <div className="w-1/2">
                 <label className="text-xs font-bold text-blue-600">Harga Normal</label>
-                <input 
-                  type="number" name="price" 
-                  className="w-full border border-blue-200 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold" 
-                  value={formData.price} onChange={handleChange} placeholder="0" 
-                />
+                <input type="number" name="price" className="w-full border border-blue-200 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none font-bold" value={formData.price} onChange={handleChange} placeholder="0" />
               </div>
               <div className="w-1/2">
                 <label className="text-xs font-bold text-green-600">Harga Grosir (Opsional)</label>
-                <input 
-                  type="number" name="wholesale_price" 
-                  className="w-full border border-green-200 p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" 
-                  value={formData.wholesale_price} onChange={handleChange} placeholder="0" 
-                />
+                <input type="number" name="wholesale_price" className="w-full border border-green-200 p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" value={formData.wholesale_price} onChange={handleChange} placeholder="0" />
               </div>
           </div>
 
-          <button type="submit" disabled={isChecking} className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-4">
+          <button type="submit" disabled={isChecking} className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-4 hover:bg-blue-700 transition">
             {isChecking ? 'Loading...' : 'Simpan'}
           </button>
         </form>
