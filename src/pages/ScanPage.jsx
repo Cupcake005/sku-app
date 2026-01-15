@@ -1,3 +1,4 @@
+
 // import React, { useState, useEffect } from 'react';
 // import { supabase } from '../supabaseClient';
 // import { useExportList } from '../ExportContext';
@@ -76,18 +77,22 @@
 //     } catch (err) { console.error('Copy Error:', err); }
 //   };
 
+//   // --- CEK DUPLIKAT SEBELUM ADD ---
 //   const handleAddItem = (product) => {
+//     // Cek apakah SKU sudah ada di exportList?
 //     const isDuplicate = exportList.some((item) => item.sku === product.sku);
+    
 //     if (isDuplicate) {
 //       alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
 //       return; 
 //     }
+    
 //     addToExportList(product);
 //     setProductData(null); 
 //     clearSearch();
 //   };
 
-//   // --- FUNGSI PENCARIAN INTI (REUSABLE) ---
+//   // --- FUNGSI PENCARIAN INTI ---
 //   const executeSearch = async (queryText) => {
 //       const query = queryText.trim();
 //       if (!query) return;
@@ -96,7 +101,6 @@
 //       setIsSearching(true);
 
 //       try {
-//         // Cari yang MIRIP (ilike), jadi 1234 akan menemukan 1234A, 1234B, dll.
 //         const { data, error } = await supabase
 //           .from('products')
 //           .select('*')
@@ -105,7 +109,6 @@
 
 //         if (error) throw error;
         
-//         // Urutkan: Jika ada yang SKU-nya SAMA PERSIS dengan query, taruh paling atas
 //         const sortedData = (data || []).sort((a, b) => {
 //             const aExact = a.sku.toLowerCase() === query.toLowerCase();
 //             const bExact = b.sku.toLowerCase() === query.toLowerCase();
@@ -122,19 +125,14 @@
 //       }
 //   };
 
-//   // --- LOGIKA SCAN (UBAH JADI SEARCH) ---
+//   // --- LOGIKA SCAN ---
 //   const handleScan = async (sku) => {
 //     playBeep();
-    
-//     // 1. Masukkan hasil scan ke kolom search
 //     setSearchQuery(sku);
-    
-//     // 2. Jalankan pencarian (bukan langsung buka modal)
-//     // Ini akan menampilkan list produk: 1234, 1234A, 1234B, dll.
 //     await executeSearch(sku);
 //   };
 
-//   // --- LOGIKA SEARCH MANUAL (TOMBOL) ---
+//   // --- LOGIKA SEARCH MANUAL ---
 //   const handleSearch = async (e) => {
 //       e.preventDefault();
 //       await executeSearch(searchQuery);
@@ -184,8 +182,6 @@
 //                 setSearchResults(prev => prev.map(p => p.id === data.id ? data : p));
 //             } else {
 //                 setAllProducts(prev => [...prev, data]);
-//                 // Jika baru ditambah, kita bisa pilih mau langsung buka modal atau list
-//                 // Di sini saya buat update list pencarian saja agar konsisten
 //                 setSearchResults(prev => [data, ...prev]);
 //             }
 //         }
@@ -258,8 +254,8 @@
 //                         <button 
 //                             onClick={(e) => {
 //                                 e.stopPropagation(); 
-//                                 addToExportList(item); 
-//                                 clearSearch();
+//                                 // --- UPDATE: Pakai handleAddItem biar dicek duplikat ---
+//                                 handleAddItem(item); 
 //                             }} 
 //                             className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
 //                             title="Quick Add"
@@ -369,6 +365,7 @@
 
 // export default ScanPage;
 
+///=============================================================================================================
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useExportList } from '../ExportContext';
@@ -385,7 +382,8 @@ const beepSound = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABA
 
 const ScanPage = () => {
   const { user } = useAuth();
-  const { exportList, addToExportList } = useExportList();
+  // 1. AMBIL updateExportItem DARI CONTEXT
+  const { exportList, addToExportList, updateExportItem } = useExportList();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
@@ -447,16 +445,37 @@ const ScanPage = () => {
     } catch (err) { console.error('Copy Error:', err); }
   };
 
-  // --- CEK DUPLIKAT SEBELUM ADD ---
+  // --- 2. UPDATE LOGIKA ADD ITEM ---
   const handleAddItem = (product) => {
     // Cek apakah SKU sudah ada di exportList?
-    const isDuplicate = exportList.some((item) => item.sku === product.sku);
+    const existingItem = exportList.find((item) => item.sku === product.sku);
     
-    if (isDuplicate) {
-      alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
+    if (existingItem) {
+      // Cek apakah harganya berbeda?
+      const isPriceChanged = 
+          existingItem.price !== product.price || 
+          existingItem.wholesale_price !== product.wholesale_price;
+
+      if (isPriceChanged) {
+          // Jika harga beda, tawarkan update
+          const confirmUpdate = window.confirm(
+              `⚠️ Produk "${product.item_name}" SUDAH ADA di list.\n\nHarga Lama: ${existingItem.price}\nHarga Baru: ${product.price}\n\nApakah Anda ingin mengupdate harganya?`
+          );
+
+          if (confirmUpdate) {
+              updateExportItem(product); // <--- Panggil fungsi update
+              alert("✅ Harga berhasil diperbarui!");
+              setProductData(null); 
+              clearSearch();
+          }
+      } else {
+          // Jika harga sama persis, anggap duplikat dan tolak
+          alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list dengan harga yang sama!`);
+      }
       return; 
     }
     
+    // Jika belum ada, tambahkan baru
     addToExportList(product);
     setProductData(null); 
     clearSearch();
@@ -624,7 +643,7 @@ const ScanPage = () => {
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation(); 
-                                // --- UPDATE: Pakai handleAddItem biar dicek duplikat ---
+                                // --- Pakai handleAddItem biar dicek duplikat ---
                                 handleAddItem(item); 
                             }} 
                             className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
