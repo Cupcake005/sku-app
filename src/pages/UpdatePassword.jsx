@@ -58,36 +58,36 @@
 
 
 //========================================================================================================
+
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Lock, KeyRound, CheckCircle, AlertCircle } from 'lucide-react';
+import { Lock, KeyRound, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'; // Tambah Eye & EyeOff
 
 const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  // State baru untuk mengecek sesi user sebelum menampilkan form
   const [verifyingSession, setVerifyingSession] = useState(true); 
   
+  // State untuk Hide/Unhide Password
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const navigate = useNavigate();
 
   // --- 1. PROTEKSI HALAMAN ---
   useEffect(() => {
     const checkSession = async () => {
-      // Cek apakah ada user yang sedang login (atau token reset password valid)
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session) {
-        // Jika tidak ada sesi (orang iseng ketik URL), tendang ke login
         navigate('/login', { replace: true });
       } else {
-        // Jika sesi valid, izinkan akses
         setVerifyingSession(false);
       }
     };
-
     checkSession();
   }, [navigate]);
 
@@ -121,8 +121,6 @@ const UpdatePassword = () => {
     }
   };
 
-  // --- 2. TAMPILAN LOADING SAAT CEK SESI ---
-  // Jangan tampilkan form dulu kalau belum selesai cek sesi
   if (verifyingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -152,34 +150,61 @@ const UpdatePassword = () => {
 
         <form onSubmit={handleUpdate} className="space-y-6">
           
+          {/* INPUT 1: Password Baru */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 block pl-1">Password Baru</label>
             <div className="relative group">
+                {/* Ikon Gembok (Kiri) */}
                 <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition" size={20} />
+                
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"} // Tipe berubah dinamis
                   required
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-gray-50 focus:bg-white font-medium"
+                  // Tambah padding kanan (pr-12) biar teks gak nabrak tombol mata
+                  className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-gray-50 focus:bg-white font-medium"
                   placeholder="Minimal 6 karakter"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+
+                {/* Tombol Mata (Kanan) */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 transition focus:outline-none"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
             </div>
           </div>
 
+          {/* INPUT 2: Konfirmasi Password */}
           <div className="space-y-2">
              <label className="text-sm font-bold text-gray-700 block pl-1">Konfirmasi Password</label>
              <div className="relative group">
+                {/* Ikon Kunci (Kiri) */}
                 <KeyRound className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition" size={20} />
+                
                 <input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"} // Tipe berubah dinamis
                   required
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-gray-50 focus:bg-white font-medium"
+                  className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-gray-50 focus:bg-white font-medium"
                   placeholder="Ketik ulang password baru"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
+
+                {/* Tombol Mata (Kanan) */}
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 transition focus:outline-none"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
             </div>
+
+             {/* Indikator Cocok/Tidak */}
              {confirmPassword && password && (
                  <div className={`text-xs flex items-center gap-1 mt-1 pl-1 ${password === confirmPassword ? 'text-green-600' : 'text-red-500'}`}>
                      {password === confirmPassword ? (
