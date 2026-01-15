@@ -369,7 +369,6 @@
 
 // export default ScanPage;
 
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useExportList } from '../ExportContext';
@@ -412,13 +411,12 @@ const ScanPage = () => {
     localStorage.setItem('camera_active', isCameraActive);
   }, [isCameraActive]);
 
-  // --- 1. FETCH ALL PRODUCTS (Auto Refresh 5 Detik) ---
+  // --- 1. FETCH ALL PRODUCTS ---
   useEffect(() => {
     const fetchAllProducts = async () => {
       try {
         const { data, error } = await supabase.from('products').select('*');
         if (error) throw error;
-        // Update hanya jika ada data
         if (data) setAllProducts(data);
       } catch (error) {
         console.error("Error fetching all products:", error.message);
@@ -443,99 +441,68 @@ const ScanPage = () => {
   const handleCopySku = async (sku) => {
     if (!sku || sku === '-') return;
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(sku);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = sku;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
+      await navigator.clipboard.writeText(sku);
       setCopiedSku(sku);
       setTimeout(() => setCopiedSku(null), 2000);
-    } catch (err) {
-      console.error('Copy Error:', err);
-    }
+    } catch (err) { console.error('Copy Error:', err); }
   };
 
-  // --- LOGIKA CEK DUPLIKAT SEBELUM ADD ---
+  // --- CEK DUPLIKAT SEBELUM ADD ---
   const handleAddItem = (product) => {
     // Cek apakah SKU sudah ada di exportList?
     const isDuplicate = exportList.some((item) => item.sku === product.sku);
     
     if (isDuplicate) {
-      // Jika duplikat, tampilkan alert dan batalkan
       alert(`⚠️ Produk "${product.item_name}" SUDAH ADA di list!`);
       return; 
     }
     
-    // Jika aman, masukkan ke list
     addToExportList(product);
     setProductData(null); 
     clearSearch();
   };
 
-  // --- FUNGSI PENCARIAN INTI (HYBRID LOCAL + DB) ---
+  // --- FUNGSI PENCARIAN INTI ---
   const executeSearch = async (queryText) => {
-      const query = queryText.trim().toLowerCase();
+      const query = queryText.trim();
       if (!query) return;
 
       setLoading(true);
       setIsSearching(true);
 
-      // 1. Cari di Local State
-      let results = allProducts.filter(item => {
-          const name = (item.item_name || '').toLowerCase();
-          const sku = (item.sku || '').toLowerCase();
-          const barcode = (item.barcode || '').toLowerCase();
-          return name.includes(query) || sku.includes(query) || barcode.includes(query);
-      });
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) 
+          .limit(20);
 
-      // 2. Jika hasil lokal sedikit, Cari ke DB (Fallback)
-      if (results.length < 5) {
-          try {
-              const { data, error } = await supabase
-                  .from('products')
-                  .select('*')
-                  .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%,barcode.eq.${query}`)
-                  .limit(20);
-              
-              if (!error && data) {
-                  const existingIds = new Set(results.map(r => r.id));
-                  const newItems = data.filter(d => !existingIds.has(d.id));
-                  results = [...results, ...newItems];
-              }
-          } catch (err) {
-              console.error("Search DB Error:", err);
-          }
+        if (error) throw error;
+        
+        const sortedData = (data || []).sort((a, b) => {
+            const aExact = a.sku.toLowerCase() === query.toLowerCase();
+            const bExact = b.sku.toLowerCase() === query.toLowerCase();
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+            return 0;
+        });
+
+        setSearchResults(sortedData);
+      } catch (error) {
+        console.error("Search Error:", error.message);
+      } finally {
+        setLoading(false);
       }
-
-      // 3. Sorting: Exact Match paling atas
-      results.sort((a, b) => {
-          const aExact = a.sku.toLowerCase() === query;
-          const bExact = b.sku.toLowerCase() === query;
-          if (aExact && !bExact) return -1;
-          if (!aExact && bExact) return 1;
-          return 0;
-      });
-
-      setSearchResults(results);
-      setLoading(false);
   };
 
-  // --- LOGIKA SCAN (TRIGGER SEARCH) ---
+  // --- LOGIKA SCAN ---
   const handleScan = async (sku) => {
     playBeep();
-    setSearchQuery(sku); 
-    await executeSearch(sku); 
+    setSearchQuery(sku);
+    await executeSearch(sku);
   };
 
-  // --- LOGIKA SEARCH MANUAL (TOMBOL) ---
+  // --- LOGIKA SEARCH MANUAL ---
   const handleSearch = async (e) => {
       e.preventDefault();
       await executeSearch(searchQuery);
@@ -559,7 +526,7 @@ const ScanPage = () => {
         brand_name: formData.brand_name || '-',
         variant_name: formData.variant_name,
         price: parseFloat(formData.price) || 0,
-        wholesale_price: parseFloat(formData.wholesale_price) || 0,
+        wholesale_price: parseFloat(formData.wholesale_price) || 0
     };
 
     if (isUpdate) {
@@ -580,13 +547,13 @@ const ScanPage = () => {
         setProductFormDefault(null); 
 
         if (data) {
-            const updateList = (list) => {
-                if (isUpdate) return list.map(p => p.id === data.id ? data : p);
-                return [data, ...list];
-            };
-            
-            setAllProducts(prev => updateList(prev));
-            setSearchResults(prev => updateList(prev));
+            if (isUpdate) {
+                setAllProducts(prev => prev.map(p => p.id === data.id ? data : p));
+                setSearchResults(prev => prev.map(p => p.id === data.id ? data : p));
+            } else {
+                setAllProducts(prev => [...prev, data]);
+                setSearchResults(prev => [data, ...prev]);
+            }
         }
     }
   };
@@ -629,79 +596,46 @@ const ScanPage = () => {
             </div>
              
              {loading ? (
-                 <div className="text-center py-10 text-gray-500 animate-pulse">Mencari...</div>
+                 <div className="text-center py-10 text-gray-500 animate-pulse">Mencari di Database...</div>
              ) : (
-                 <div className="space-y-4 pb-20 pt-2"> 
-                    {searchResults.map((item) => {
-                      const isExactMatch = item.sku.toLowerCase() === searchQuery.toLowerCase();
-
-                      return (
-                        <div 
-                          key={item.id} 
-                          onClick={() => handleItemClick(item)} 
-                          className={`
-                            relative flex justify-between items-center cursor-pointer transition-all duration-300
-                            rounded-xl p-3
-                            ${isExactMatch 
-                                ? 'border-2 border-blue-500 bg-blue-50 shadow-xl scale-105 z-10 my-2 ring-2 ring-blue-100' 
-                                : 'border border-gray-200 bg-white shadow-sm hover:bg-gray-50 active:scale-[0.98]'
-                            }
-                          `}
-                        >
-                          {isExactMatch && (
-                            <div className="absolute -top-3 left-3 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1 animate-bounce">
-                                <Check size={10} /> PILIHAN TEPAT
-                            </div>
-                          )}
-
-                          <div className="flex-1">
-                            <div className={`font-bold ${isExactMatch ? 'text-blue-900 text-lg' : 'text-gray-800'}`}>
-                                {item.item_name}
-                            </div>
-                            
-                            <div className="flex items-center gap-2 mb-1 mt-1">
-                              <div className={`text-xs font-mono px-1.5 py-0.5 rounded ${isExactMatch ? 'bg-blue-200 text-blue-800 font-bold' : 'bg-gray-100 text-gray-500'}`}>
-                                {item.sku}
-                              </div>
-                              
-                              <button 
-                                  onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
-                                  className="text-gray-400 hover:text-blue-600 transition p-1"
-                              >
-                                  {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                              </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1">
-                              {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
-                              {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
-                              {item.unit && <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-green-100 font-medium">{item.unit}</span>}
-                            </div>
+                 <div className="space-y-3 pb-20">
+                    {searchResults.map((item) => (
+                      <div 
+                        key={item.id} 
+                        onClick={() => handleItemClick(item)} 
+                        className="border p-3 rounded-lg shadow-sm flex justify-between items-center bg-white cursor-pointer hover:bg-blue-50 transition active:scale-[0.98]"
+                      >
+                        <div className="flex-1">
+                          <div className="font-bold text-gray-800">{item.item_name}</div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="text-xs text-gray-500 font-mono bg-gray-100 px-1 rounded">{item.sku}</div>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
+                                className="text-gray-400 hover:text-blue-600 transition p-1"
+                            >
+                                {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                            </button>
                           </div>
-                          
-                          <button 
-                              onClick={(e) => {
-                                  e.stopPropagation(); 
-                                  // --- PERBAIKAN DISINI ---
-                                  // Panggil handleAddItem agar dicek dulu duplikatnya
-                                  handleAddItem(item); 
-                              }} 
-                              className={`
-                                p-3 rounded-full shadow-sm transition
-                                ${isExactMatch 
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-110 shadow-lg' 
-                                    : 'ml-3 bg-orange-100 text-orange-600 hover:bg-orange-200'
-                                }
-                              `}
-                              title="Quick Add"
-                          >
-                              <Plus size={isExactMatch ? 24 : 20} />
-                          </button>
+                          <div className="flex flex-wrap gap-1">
+                            {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
+                            {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
+                          </div>
                         </div>
-                      );
-                    })}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation(); 
+                                // --- UPDATE: Pakai handleAddItem biar dicek duplikat ---
+                                handleAddItem(item); 
+                            }} 
+                            className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
+                            title="Quick Add"
+                        >
+                            <Plus size={20} />
+                        </button>
+                      </div>
+                    ))}
                     
-                    {searchResults.length === 0 && (
+                    {searchResults.length === 0 && !loading && (
                         <div className="text-center py-10">
                             <p className="text-gray-400">Produk tidak ditemukan.</p>
                             <button 
@@ -776,7 +710,6 @@ const ScanPage = () => {
           </div>
       )}
 
-      {/* MODALS */}
       <ProductModal 
         isOpen={showAddModal}
         onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} 
@@ -790,7 +723,7 @@ const ScanPage = () => {
         isOpen={!!productData} 
         onClose={() => setProductData(null)}
         product={productData}
-        onAddToExport={handleAddItem} // Pastikan modal pakai handleAddItem
+        onAddToExport={handleAddItem}
         allProducts={allProducts} 
         setIsScannerActive={setIsCameraActive} 
         onEditMaster={handleEditMaster} 
