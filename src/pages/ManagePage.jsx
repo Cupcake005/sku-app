@@ -397,7 +397,7 @@ const ManagePage = () => {
   
   // --- STATE MODAL & SCANNER ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState(null); // null = Mode Tambah
+  const [currentProduct, setCurrentProduct] = useState(null); 
   const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -414,20 +414,21 @@ const ManagePage = () => {
     }
   }, [searchParams, user]);
 
-  // --- 2. FETCH DATA (CHUNK LOOP - BYPASS 1000 LIMIT) ---
+  // --- 2. FETCH DATA (Filter by User ID) ---
   const fetchProducts = async () => {
+    if (!user) return;
     setLoading(true);
     try {
         let allData = [];
         let from = 0;
-        const step = 1000; // Ambil per 1000 baris
+        const step = 1000; 
         let more = true;
 
         while (more) {
             const { data, error } = await supabase
                 .from('products')
                 .select('*')
-                .eq('user_id', user.id) // Filter by User ID
+                .eq('user_id', user.id) // <--- AMAN: Hanya ambil data user sendiri
                 .order('created_at', { ascending: false })
                 .range(from, from + step - 1);
 
@@ -436,7 +437,7 @@ const ManagePage = () => {
             if (data && data.length > 0) {
                 allData = [...allData, ...data];
                 from += step;
-                if (data.length < step) more = false; // Data habis
+                if (data.length < step) more = false; 
             } else {
                 more = false;
             }
@@ -450,43 +451,38 @@ const ManagePage = () => {
     }
   };
 
-  // --- 3. SAVE PRODUCT (CREATE, UPDATE & VARIANT) ---
+  // --- 3. SAVE PRODUCT (FIX: HAPUS UNIT) ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
     if (!user) return alert("Sesi habis. Silakan login ulang.");
     setLoading(true);
     
-    // Logika Update: HANYA JIKA bukan mode varian, ada produk, dan ada ID
     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
-
     let error;
 
     const payload = {
         sku: formData.sku,
         item_name: formData.item_name,
         category: formData.category,
-        brand_name: formData.brand_name,
+        brand_name: formData.brand_name || '-',
         variant_name: formData.variant_name,
-        price: parseFloat(formData.price),
+        price: parseFloat(formData.price) || 0,
         wholesale_price: parseFloat(formData.wholesale_price) || 0,
-        unit: formData.unit || 'Pcs'
+        // unit: formData.unit || 'Pcs'  <-- INI DIHAPUS BIAR GAK ERROR
     };
 
     if (isUpdate) {
-      // --- UPDATE (Edit Data Lama) ---
+      // UPDATE
       const { error: err } = await supabase
         .from('products')
         .update(payload)
         .eq('id', currentProduct.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id); 
       error = err;
     } else {
-      // --- CREATE (Data Baru / Varian Baru) ---
+      // CREATE
       const { error: err } = await supabase
         .from('products')
-        .insert([{
-          ...payload,
-          user_id: user.id // Bind ke User
-        }]);
+        .insert([{ ...payload, user_id: user.id }]);
       error = err;
     }
 
@@ -509,8 +505,14 @@ const ManagePage = () => {
 
   // --- 4. HAPUS DATA ---
   const handleDelete = async (id, name) => {
+    if (!user) return;
     if (window.confirm(`Yakin hapus "${name}"?`)) {
-      const { error } = await supabase.from('products').delete().eq('id', id).eq('user_id', user.id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id); // <--- AMAN: Hanya hapus milik user sendiri
+
       if (error) alert('Gagal hapus: ' + error.message);
       else setProducts(products.filter(item => item.id !== id));
     }
@@ -527,21 +529,23 @@ const ManagePage = () => {
     setIsModalOpen(true);
   };
 
-  // --- 6. EXPORT CSV (UPDATE: TAMBAH KOLOM GROSIR) ---
+  // --- 6. EXPORT CSV ---
   const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
-      const header = "Category,SKU,Unit,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+      
+      const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price";
       const rows = products.map(item => {
         const category = `"${item.category || ''}"`;
         const sku = `"${item.sku || ''}"`; 
-        const unit = `"${item.unit || ''}"`;
-        const name = `"${item.item_name || ''}"`;
+        const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
         const brand = `"${item.brand_name || ''}"`;
         const variant = `"${item.variant_name || ''}"`;
         const price = item.price || 0;
         const wholesale = item.wholesale_price || 0;
-        return `${category},${sku},${unit},${name},${brand},${variant},${price},${wholesale}`;
+        
+        return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
       });
+
       const csvContent = [header, ...rows].join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
@@ -553,7 +557,7 @@ const ManagePage = () => {
       document.body.removeChild(link);
   };
 
-  // --- 7. IMPORT CSV (UPDATE: TAMBAH KOLOM GROSIR) ---
+  // --- 7. IMPORT CSV (FIX: HAPUS UNIT) ---
   const handleImportClick = () => { 
       if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
           fileInputRef.current.click(); 
@@ -590,11 +594,14 @@ const ManagePage = () => {
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
             const columns = parseCSVLine(line);
-            if (columns.length >= 7) { // Adjusted for unit column
+            
+            // Minimal 7 kolom (Tanpa Unit)
+            if (columns.length >= 7) {
                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
+                
                 const category = clean(columns[0]); 
                 let sku = clean(columns[1]); 
-                const unit = clean(columns[2]);
+                // const unit = clean(columns[2]); // SKIP UNIT
                 const item_name = clean(columns[3]); 
                 const brand_name = clean(columns[4]); 
                 const variant_name = clean(columns[5]);
@@ -602,7 +609,6 @@ const ManagePage = () => {
                 let priceStr = clean(columns[6]).replace(/[^0-9.]/g, ''); 
                 const price = parseFloat(priceStr) || 0;
 
-                // Ambil harga grosir (kolom ke-8 jika ada)
                 let wholesaleStr = columns[7] ? clean(columns[7]).replace(/[^0-9.]/g, '') : '0';
                 const wholesale_price = parseFloat(wholesaleStr) || 0;
                 
@@ -610,23 +616,27 @@ const ManagePage = () => {
                 
                 if (item_name) { 
                     dataToInsert.push({ 
-                        user_id: user.id, 
+                        user_id: user.id, // <--- PENTING: Tandai milik user ini
                         category, 
                         sku: String(sku), 
-                        unit: unit || 'Pcs',
+                        // unit: unit || 'Pcs', <-- DIHAPUS JUGA
                         item_name, 
                         brand_name, 
                         variant_name, 
                         price,
-                        wholesale_price // Simpan ke DB
+                        wholesale_price 
                     }); 
                 }
             }
         }
 
         if (dataToInsert.length > 0) {
-            // Hapus data lama milik user ini saja (aman karena RLS)
-            const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
+            // Hapus data lama milik user ini saja
+            const { error: deleteError } = await supabase
+                .from('products')
+                .delete()
+                .eq('user_id', user.id); 
+
             if (deleteError) throw deleteError;
 
             // Insert data baru
@@ -716,7 +726,6 @@ const ManagePage = () => {
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
-                    {item.unit && <span className="bg-green-50 text-green-600 px-1.5 py-0.5 rounded text-[10px] border border-green-100 font-medium">{item.unit}</span>}
                   </div>
                   
                   {/* Info Harga */}
@@ -724,7 +733,6 @@ const ManagePage = () => {
                       <div className="text-sm font-bold text-blue-600">
                         Rp {(item.price || 0).toLocaleString()}
                       </div>
-                      {/* Tampilkan Label Grosir Jika Ada */}
                       {item.wholesale_price > 0 && (
                         <div className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-1 rounded">
                            Grosir: Rp {(item.wholesale_price).toLocaleString()}
@@ -753,7 +761,7 @@ const ManagePage = () => {
         product={currentProduct}
         onSave={handleSaveProduct}
         onScanClick={() => { setIsModalOpen(false); setShowScanner(true); }} 
-        allProducts={products} // Pass allProducts to modal!
+        allProducts={products} 
       />
 
     </div>
