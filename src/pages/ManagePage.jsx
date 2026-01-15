@@ -658,10 +658,7 @@ const ManagePage = () => {
     // Ambil data (handle null dengan string kosong)
     const name = (item.item_name || '').toLowerCase();
     const sku = (item.sku || '').toLowerCase();
-    const brand = (item.brand_name || '').toLowerCase();
-    const variant = (item.variant_name || '').toLowerCase();
-    const category = (item.category || '').toLowerCase();
-
+    
     // Cek apakah query ada di salah satu kolom
     return name.includes(query) || 
            sku.includes(query) || 
