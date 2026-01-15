@@ -1,5 +1,6 @@
 
-// //============================================================================
+//====================================================================================================================
+
 // import React, { useState, useEffect, useRef } from 'react';
 // import { useSearchParams } from 'react-router-dom';
 // import { supabase } from '../supabaseClient';
@@ -7,6 +8,9 @@
 // import Scanner from '../components/Scanner';
 // import ProductModal from '../components/ProductModal';
 // import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X } from 'lucide-react';
+
+// // 1. IMPORT MODAL
+// import ConfirmationModal from '../components/ConfirmationModal'; 
 
 // const ManagePage = () => {
 //   const { user } = useAuth(); 
@@ -21,7 +25,16 @@
 //   const [showScanner, setShowScanner] = useState(false);
 //   const fileInputRef = useRef(null);
 
-//   // --- 1. LOGIKA INIT & URL PARAM ---
+//   // --- 2. STATE KONFIGURASI MODAL KONFIRMASI ---
+//   const [modalConfig, setModalConfig] = useState({
+//     isOpen: false,
+//     type: null, // 'DELETE' atau 'IMPORT'
+//     title: '',
+//     message: '',
+//     data: null // Menyimpan ID untuk delete
+//   });
+
+//   // --- LOGIKA INIT & URL PARAM ---
 //   useEffect(() => {
 //     if (user) {
 //         fetchProducts();
@@ -34,7 +47,7 @@
 //     }
 //   }, [searchParams, user]);
 
-//   // --- 2. FETCH DATA ---
+//   // --- FETCH DATA ---
 //   const fetchProducts = async () => {
 //     if (!user) return;
 //     setLoading(true);
@@ -71,7 +84,7 @@
 //     }
 //   };
 
-//   // --- 3. SAVE PRODUCT (MANUAL) ---
+//   // --- SAVE PRODUCT (MANUAL) ---
 //   const handleSaveProduct = async (formData, isVariantMode = false) => {
 //     if (!user) return alert("Sesi habis. Silakan login ulang.");
 //     setLoading(true);
@@ -120,25 +133,61 @@
 //     }
 //   };
 
-//   // --- 4. HAPUS DATA ---
-//   const handleDelete = async (id, name) => {
+//   // --- 3. PEMICU MODAL DELETE ---
+//   const triggerDelete = (id, name) => {
 //     if (!user) return;
-//     if (window.confirm(`Yakin hapus "${name}"?`)) {
-//       const { error } = await supabase
-//         .from('products')
-//         .delete()
-//         .eq('id', id)
-//         .eq('user_id', user.id);
+//     setModalConfig({
+//         isOpen: true,
+//         type: 'DELETE',
+//         title: 'Hapus Produk?',
+//         message: `Apakah Anda yakin ingin menghapus "${name}"? Data yang dihapus tidak dapat dikembalikan.`,
+//         data: { id },
+//         confirmLabel: 'Hapus', // Teks Merah
+//         isDanger: true         // Warna Merah
+//     });
+//   };
 
-//       if (error) alert('Gagal hapus: ' + error.message);
-//       else setProducts(products.filter(item => item.id !== id));
-//     }
+//   // --- 4. PEMICU MODAL IMPORT ---
+ 
+//   const triggerImport = () => {
+//     setModalConfig({
+//         isOpen: true,
+//         type: 'IMPORT',
+//         title: 'Import Data Excel?',
+//         message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
+//         data: null,
+//         confirmLabel: 'Import Data', // Teks Biru
+//         isDanger: false              // Warna Biru (karena konfirmasi biasa, meski import itu destruktif, biasanya biru/warning ok)
+//     });
+//   };
+
+//   // --- 5. EKSEKUSI AKSI SETELAH KONFIRMASI ---
+//   const handleConfirmAction = async () => {
+//       // Jika tipe DELETE
+//       if (modalConfig.type === 'DELETE') {
+//           const { id } = modalConfig.data;
+//           const { error } = await supabase
+//             .from('products')
+//             .delete()
+//             .eq('id', id)
+//             .eq('user_id', user.id);
+
+//           if (error) alert('Gagal hapus: ' + error.message);
+//           else setProducts(products.filter(item => item.id !== id));
+//       } 
+//       // Jika tipe IMPORT
+//       else if (modalConfig.type === 'IMPORT') {
+//           fileInputRef.current.click(); // Buka file dialog
+//       }
+
+//       // Tutup Modal
+//       setModalConfig({ ...modalConfig, isOpen: false });
 //   };
 
 //   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
 //   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-//   // --- 5. EXPORT CSV ---
+//   // --- EXPORT CSV ---
 //   const handleExport = () => { 
 //       if (products.length === 0) return alert("Data kosong!");
       
@@ -167,13 +216,7 @@
 //       document.body.removeChild(link);
 //   };
 
-//   // --- 6. IMPORT CSV ---
-//   const handleImportClick = () => { 
-//       if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
-//           fileInputRef.current.click(); 
-//       }
-//   };
-  
+//   // --- IMPORT CSV LOGIC ---
 //   const handleFileChange = async (e) => {
 //     const file = e.target.files[0];
 //     if (!file) return;
@@ -256,7 +299,7 @@
 //       }
 //   };
 
-//   // --- 8. UI HELPERS ---
+//   // --- UI HELPERS ---
 //   const handleScanSearch = (sku) => { 
 //       setSearchQuery(sku); 
 //       setShowScanner(false); 
@@ -266,16 +309,14 @@
 //   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
 //   const clearSearch = () => { setSearchQuery(''); }; 
 
-//   // --- LOGIKA FILTER PENCARIAN (KHUSUS SKU & BRAND) ---
 //   const filteredProducts = products.filter(item => {
 //     const query = searchQuery.toLowerCase().trim();
-//     if (!query) return true; // Tampilkan semua jika kosong
+//     if (!query) return true; 
 
-//     // Ambil data
 //     const sku = (item.sku || '').toLowerCase();
 //     const brand = (item.brand_name || '').toLowerCase();
 
-//     // HANYA CEK SKU ATAU BRAND (Nama Barang diabaikan)
+//     // HANYA CEK SKU ATAU BRAND (Sesuai kode sebelumnya)
 //     return sku.includes(query) || brand.includes(query);
 //   });
 
@@ -296,7 +337,9 @@
 //         <div className="flex flex-col gap-2 mb-6">
 //           <div className="flex gap-2">
 //             <button onClick={handleExport} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"><Download size={18} /> Export Excel</button>
-//             <button onClick={handleImportClick} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
+            
+//             {/* Ganti onClick ke triggerImport */}
+//             <button onClick={triggerImport} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
 //           </div>
           
 //           <button 
@@ -324,7 +367,6 @@
 //             type="text" 
 //             value={searchQuery} 
 //             onChange={(e) => setSearchQuery(e.target.value)}
-//             // Placeholder diupdate agar sesuai
 //             placeholder="Cari SKU atau Brand..."
 //             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
 //           />
@@ -345,12 +387,10 @@
 //                 <div className="flex-1">
 //                   <div className="font-bold text-gray-800">{item.item_name}</div>
 //                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
-//                     {/* Highlight SKU jika dicari */}
 //                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${searchQuery && item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-200'}`}>
 //                         SKU: {item.sku}
 //                     </span>
 //                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
-//                     {/* Highlight Brand jika dicari */}
 //                     {item.brand_name && item.brand_name !== '-' && (
 //                         <span className={`px-1.5 py-0.5 rounded text-[10px] border ${searchQuery && item.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
 //                             {item.brand_name}
@@ -375,7 +415,8 @@
 
 //                 <div className="flex gap-2 ml-2">
 //                   <button onClick={() => handleOpenEdit(item)} className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"><Edit size={18} /></button>
-//                   <button onClick={() => handleDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
+//                   {/* Ganti onClick ke triggerDelete */}
+//                   <button onClick={() => triggerDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
 //                 </div>
 //               </div>
 //             ))}
@@ -385,6 +426,17 @@
 //       </div>
 
 //       <button onClick={scrollToTop} className="fixed bottom-24 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-40 transition-all hover:scale-110 active:scale-95"><ArrowUp size={24} /></button>
+
+//       {/* --- 6. RENDER MODAL KONFIRMASI --- */}
+//       <ConfirmationModal 
+//           isOpen={modalConfig.isOpen}
+//           onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+//           onConfirm={handleConfirmAction}
+//           title={modalConfig.title}
+//           message={modalConfig.message}
+//           confirmLabel={modalConfig.confirmLabel} // Tambahkan ini
+//           isDanger={modalConfig.isDanger}         // Tambahkan ini
+//       />
 
 //       <ProductModal 
 //         isOpen={isModalOpen} 
@@ -401,7 +453,8 @@
 
 // export default ManagePage;
 
-//====================================================================================================================
+////===================================================================================================
+
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -411,8 +464,9 @@ import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal';
 import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X } from 'lucide-react';
 
-// 1. IMPORT MODAL
+// IMPORT MODALS
 import ConfirmationModal from '../components/ConfirmationModal'; 
+import NotificationModal from '../components/NotificationModal'; // 1. Import NotificationModal
 
 const ManagePage = () => {
   const { user } = useAuth(); 
@@ -427,21 +481,39 @@ const ManagePage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
-  // --- 2. STATE KONFIGURASI MODAL KONFIRMASI ---
+  // --- STATE KONFIGURASI MODAL KONFIRMASI (Delete/Import) ---
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
-    type: null, // 'DELETE' atau 'IMPORT'
+    type: null, 
     title: '',
     message: '',
-    data: null // Menyimpan ID untuk delete
+    data: null, 
+    confirmLabel: '',
+    isDanger: false
   });
 
-  // --- LOGIKA INIT & URL PARAM ---
+  // --- 2. STATE MODAL NOTIFIKASI (Pengganti Alert) ---
+  const [notifyModal, setNotifyModal] = useState({
+    isOpen: false,
+    type: 'success', // success, error, info
+    title: '',
+    message: ''
+  });
+
+  // Helper Notifikasi
+  const showNotify = (type, title, message) => {
+    setNotifyModal({ isOpen: true, type, title, message });
+  };
+
+  const closeNotify = () => {
+    setNotifyModal({ ...notifyModal, isOpen: false });
+  };
+
+  // --- LOGIKA INIT ---
   useEffect(() => {
     if (user) {
         fetchProducts();
     }
-    
     const skuFromUrl = searchParams.get('sku');
     if (skuFromUrl) {
       setCurrentProduct({ sku: skuFromUrl }); 
@@ -477,7 +549,6 @@ const ManagePage = () => {
                 more = false;
             }
         }
-        
         setProducts(allData);
     } catch (error) {
         console.error("Error fetching products:", error);
@@ -486,9 +557,9 @@ const ManagePage = () => {
     }
   };
 
-  // --- SAVE PRODUCT (MANUAL) ---
+  // --- SAVE PRODUCT ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
-    if (!user) return alert("Sesi habis. Silakan login ulang.");
+    if (!user) return showNotify('error', 'Sesi Habis', 'Silakan login ulang.');
     setLoading(true);
     
     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
@@ -505,29 +576,23 @@ const ManagePage = () => {
     };
 
     if (isUpdate) {
-      const { error: err } = await supabase
-        .from('products')
-        .update(payload)
-        .eq('id', currentProduct.id)
-        .eq('user_id', user.id); 
+      const { error: err } = await supabase.from('products').update(payload).eq('id', currentProduct.id).eq('user_id', user.id); 
       error = err;
     } else {
-      const { error: err } = await supabase
-        .from('products')
-        .insert([{ ...payload, user_id: user.id }]);
+      const { error: err } = await supabase.from('products').insert([{ ...payload, user_id: user.id }]);
       error = err;
     }
 
     setLoading(false);
 
     if (error) {
-      alert(`Gagal ${isUpdate ? 'update' : 'tambah'}: ` + error.message);
+      showNotify('error', 'Gagal Menyimpan', error.message);
     } else {
-      const successMsg = isVariantMode 
-        ? '✅ Varian baru berhasil dibuat!' 
-        : (isUpdate ? '✅ Produk berhasil diperbarui!' : '✅ Produk berhasil ditambahkan!');
-      
-      alert(successMsg);
+      showNotify(
+          'success', 
+          'Berhasil', 
+          isVariantMode ? 'Varian baru berhasil dibuat!' : (isUpdate ? 'Produk berhasil diperbarui!' : 'Produk berhasil ditambahkan!')
+      );
       setIsModalOpen(false);
       setCurrentProduct(null);
       setSearchParams({});
@@ -535,7 +600,7 @@ const ManagePage = () => {
     }
   };
 
-  // --- 3. PEMICU MODAL DELETE ---
+  // --- PEMICU MODAL DELETE ---
   const triggerDelete = (id, name) => {
     if (!user) return;
     setModalConfig({
@@ -544,22 +609,12 @@ const ManagePage = () => {
         title: 'Hapus Produk?',
         message: `Apakah Anda yakin ingin menghapus "${name}"? Data yang dihapus tidak dapat dikembalikan.`,
         data: { id },
-        confirmLabel: 'Hapus', // Teks Merah
-        isDanger: true         // Warna Merah
+        confirmLabel: 'Hapus',
+        isDanger: true 
     });
   };
 
-  // --- 4. PEMICU MODAL IMPORT ---
-  // const triggerImport = () => {
-  //   setModalConfig({
-  //       isOpen: true,
-  //       type: 'IMPORT',
-  //       title: 'Import Data Excel?',
-  //       message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
-  //       data: null
-  //   });
-  // };
-
+  // --- PEMICU MODAL IMPORT ---
   const triggerImport = () => {
     setModalConfig({
         isOpen: true,
@@ -567,43 +622,37 @@ const ManagePage = () => {
         title: 'Import Data Excel?',
         message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
         data: null,
-        confirmLabel: 'Import Data', // Teks Biru
-        isDanger: false              // Warna Biru (karena konfirmasi biasa, meski import itu destruktif, biasanya biru/warning ok)
+        confirmLabel: 'Import Data',
+        isDanger: false 
     });
   };
 
-  // --- 5. EKSEKUSI AKSI SETELAH KONFIRMASI ---
+  // --- EKSEKUSI KONFIRMASI ---
   const handleConfirmAction = async () => {
-      // Jika tipe DELETE
       if (modalConfig.type === 'DELETE') {
           const { id } = modalConfig.data;
-          const { error } = await supabase
-            .from('products')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user.id);
-
-          if (error) alert('Gagal hapus: ' + error.message);
-          else setProducts(products.filter(item => item.id !== id));
-      } 
-      // Jika tipe IMPORT
-      else if (modalConfig.type === 'IMPORT') {
-          fileInputRef.current.click(); // Buka file dialog
+          const { error } = await supabase.from('products').delete().eq('id', id).eq('user_id', user.id);
+          
+          if (error) {
+              showNotify('error', 'Gagal Hapus', error.message);
+          } else {
+              setProducts(products.filter(item => item.id !== id));
+              // Opsional: Tampilkan notifikasi sukses kecil jika mau, tapi biasanya list update sudah cukup
+          }
+      } else if (modalConfig.type === 'IMPORT') {
+          fileInputRef.current.click();
       }
-
-      // Tutup Modal
       setModalConfig({ ...modalConfig, isOpen: false });
   };
 
   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-  // --- EXPORT CSV ---
+  // --- EXPORT & IMPORT ---
   const handleExport = () => { 
-      if (products.length === 0) return alert("Data kosong!");
+      if (products.length === 0) return showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
       
       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
-      
       const rows = products.map(item => {
         const category = `"${item.category || ''}"`;
         const sku = `"${item.sku || ''}"`; 
@@ -612,10 +661,8 @@ const ManagePage = () => {
         const variant = `"${item.variant_name || ''}"`;
         const price = item.price || 0;
         const wholesale = item.wholesale_price || 0;
-        
         return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
       });
-
       const csvContent = [header, ...rows].join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
@@ -627,7 +674,6 @@ const ManagePage = () => {
       document.body.removeChild(link);
   };
 
-  // --- IMPORT CSV LOGIC ---
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -638,12 +684,11 @@ const ManagePage = () => {
   };
 
   const processImport = async (csvText) => { 
-      if (!user) return alert("Harus login untuk import!");
+      if (!user) return showNotify('error', 'Akses Ditolak', 'Harus login untuk import!');
       setLoading(true);
       try {
         const lines = csvText.split('\n');
         const dataToInsert = [];
-        
         const parseCSVLine = (text) => {
             const result = []; let current = ''; let inQuotes = false;
             for (let i = 0; i < text.length; i++) {
@@ -658,35 +703,20 @@ const ManagePage = () => {
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
             const columns = parseCSVLine(line);
-            
             if (columns.length >= 6) { 
                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
-                
                 const category = clean(columns[0]); 
                 let sku = clean(columns[1]); 
                 const item_name = clean(columns[2]); 
                 const brand_name = clean(columns[3]); 
                 const variant_name = clean(columns[4]);
-                
                 let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
                 const price = parseFloat(priceStr) || 0;
-
                 let wholesaleStr = columns[6] ? clean(columns[6]).replace(/[^0-9.]/g, '') : '0';
                 const wholesale_price = parseFloat(wholesaleStr) || 0;
-                
                 if (!sku) sku = "-";
-                
                 if (item_name) { 
-                    dataToInsert.push({ 
-                        user_id: user.id, 
-                        category, 
-                        sku: String(sku), 
-                        item_name, 
-                        brand_name, 
-                        variant_name, 
-                        price,
-                        wholesale_price
-                    }); 
+                    dataToInsert.push({ user_id: user.id, category, sku: String(sku), item_name, brand_name, variant_name, price, wholesale_price }); 
                 }
             }
         }
@@ -694,17 +724,16 @@ const ManagePage = () => {
         if (dataToInsert.length > 0) {
             const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
             if (deleteError) throw deleteError;
-
             const { error: insertError } = await supabase.from('products').insert(dataToInsert);
             if (insertError) throw insertError;
             
-            alert(`✅ Sukses! ${dataToInsert.length} data baru dimasukkan.`); 
+            showNotify('success', 'Import Berhasil', `${dataToInsert.length} data baru berhasil dimasukkan.`);
             fetchProducts(); 
         } else { 
-            alert("⚠️ File kosong atau format salah."); 
+            showNotify('info', 'File Kosong', "File kosong atau format tidak sesuai.");
         }
       } catch (error) { 
-          alert('Gagal Import: ' + error.message); 
+          showNotify('error', 'Gagal Import', error.message);
       } finally { 
           setLoading(false); 
       }
@@ -714,21 +743,22 @@ const ManagePage = () => {
   const handleScanSearch = (sku) => { 
       setSearchQuery(sku); 
       setShowScanner(false); 
-      alert(`🔍 Mencari SKU: ${sku}`); 
+      // Ganti alert pencarian dengan notifikasi info
+      showNotify('info', 'Scan Berhasil', `Mencari SKU: ${sku}`);
   };
   
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const clearSearch = () => { setSearchQuery(''); }; 
 
+  // --- FILTER PENCARIAN (HANYA NAMA & SKU) ---
   const filteredProducts = products.filter(item => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true; 
 
+    const itemName = (item.item_name || '').toLowerCase();
     const sku = (item.sku || '').toLowerCase();
-    const brand = (item.brand_name || '').toLowerCase();
 
-    // HANYA CEK SKU ATAU BRAND (Sesuai kode sebelumnya)
-    return sku.includes(query) || brand.includes(query);
+    return itemName.includes(query) || sku.includes(query);
   });
 
   return (
@@ -748,18 +778,11 @@ const ManagePage = () => {
         <div className="flex flex-col gap-2 mb-6">
           <div className="flex gap-2">
             <button onClick={handleExport} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"><Download size={18} /> Export Excel</button>
-            
-            {/* Ganti onClick ke triggerImport */}
             <button onClick={triggerImport} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
           </div>
-          
-          <button 
-            onClick={handleOpenAdd}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 shadow"
-          >
+          <button onClick={handleOpenAdd} className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-700 shadow">
             <Plus size={18} /> Tambah Data Manual
           </button>
-
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
         </div>
 
@@ -778,7 +801,7 @@ const ManagePage = () => {
             type="text" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari SKU atau Brand..."
+            placeholder="Cari Nama Barang atau SKU..." 
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
           {searchQuery && (
@@ -803,14 +826,13 @@ const ManagePage = () => {
                     </span>
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
                     {item.brand_name && item.brand_name !== '-' && (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${searchQuery && item.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] border bg-purple-50 text-purple-600 border-purple-100">
                             {item.brand_name}
                         </span>
                     )}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
                   </div>
                   
-                  {/* Info Harga */}
                   <div className="flex gap-3 mt-1">
                       <div className="text-sm font-bold text-blue-600">
                         Rp {(item.price || 0).toLocaleString()}
@@ -821,32 +843,38 @@ const ManagePage = () => {
                         </div>
                       )}
                   </div>
-
                 </div>
 
                 <div className="flex gap-2 ml-2">
                   <button onClick={() => handleOpenEdit(item)} className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"><Edit size={18} /></button>
-                  {/* Ganti onClick ke triggerDelete */}
                   <button onClick={() => triggerDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
                 </div>
               </div>
             ))}
-            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada Brand/SKU: "${searchQuery}"` : "Data kosong."}</p>}
+            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada Nama/SKU: "${searchQuery}"` : "Data kosong."}</p>}
           </div>
         )}
       </div>
 
       <button onClick={scrollToTop} className="fixed bottom-24 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-40 transition-all hover:scale-110 active:scale-95"><ArrowUp size={24} /></button>
 
-      {/* --- 6. RENDER MODAL KONFIRMASI --- */}
+      {/* RENDER MODALS */}
       <ConfirmationModal 
           isOpen={modalConfig.isOpen}
           onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
           onConfirm={handleConfirmAction}
           title={modalConfig.title}
           message={modalConfig.message}
-          confirmLabel={modalConfig.confirmLabel} // Tambahkan ini
-          isDanger={modalConfig.isDanger}         // Tambahkan ini
+          confirmLabel={modalConfig.confirmLabel}
+          isDanger={modalConfig.isDanger}
+      />
+
+      <NotificationModal 
+          isOpen={notifyModal.isOpen}
+          onClose={closeNotify}
+          type={notifyModal.type}
+          title={notifyModal.title}
+          message={notifyModal.message}
       />
 
       <ProductModal 
