@@ -543,18 +543,32 @@ const ManagePage = () => {
         type: 'DELETE',
         title: 'Hapus Produk?',
         message: `Apakah Anda yakin ingin menghapus "${name}"? Data yang dihapus tidak dapat dikembalikan.`,
-        data: { id }
+        data: { id },
+        confirmLabel: 'Hapus', // Teks Merah
+        isDanger: true         // Warna Merah
     });
   };
 
   // --- 4. PEMICU MODAL IMPORT ---
+  // const triggerImport = () => {
+  //   setModalConfig({
+  //       isOpen: true,
+  //       type: 'IMPORT',
+  //       title: 'Import Data Excel?',
+  //       message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
+  //       data: null
+  //   });
+  // };
+
   const triggerImport = () => {
     setModalConfig({
         isOpen: true,
         type: 'IMPORT',
         title: 'Import Data Excel?',
         message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
-        data: null
+        data: null,
+        confirmLabel: 'Import Data', // Teks Biru
+        isDanger: false              // Warna Biru (karena konfirmasi biasa, meski import itu destruktif, biasanya biru/warning ok)
     });
   };
 
@@ -826,11 +840,13 @@ const ManagePage = () => {
 
       {/* --- 6. RENDER MODAL KONFIRMASI --- */}
       <ConfirmationModal 
-        isOpen={modalConfig.isOpen}
-        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
-        onConfirm={handleConfirmAction}
-        title={modalConfig.title}
-        message={modalConfig.message}
+          isOpen={modalConfig.isOpen}
+          onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+          onConfirm={handleConfirmAction}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          confirmLabel={modalConfig.confirmLabel} // Tambahkan ini
+          isDanger={modalConfig.isDanger}         // Tambahkan ini
       />
 
       <ProductModal 

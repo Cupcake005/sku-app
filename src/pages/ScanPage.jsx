@@ -1188,6 +1188,8 @@ const ScanPage = () => {
         onConfirm={executeUpdate}
         title="Update Harga?"
         message={`Produk "${pendingUpdateProduct?.item_name}" sudah ada di list, tapi harganya berbeda.`}
+        confirmLabel="Ya, Update" // Pastikan teksnya Update
+        isDanger={false}
         details={
             existingProductData && pendingUpdateProduct ? (
                 <div className="grid grid-cols-2 gap-4 text-center">
