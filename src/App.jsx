@@ -93,7 +93,8 @@ import SwipeWrapper from './components/SwipeWrapper';
 import InstallPWA from './components/InstallPWA';
 import LoginPage from './pages/LoginPage';
 import TopHeader from './components/TopHeader'; 
-import UpdatePassword from './pages/UpdatePassword'; // <--- 1. Import Halaman Baru
+
+import UpdatePassword from './pages/UpdatePassword';
 
 // --- SATPAM (PROTEKSI) ---
 const ProtectedRoute = ({ children }) => {
