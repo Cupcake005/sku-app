@@ -242,7 +242,9 @@
 
 
 //==================================================================
-import React, { useState } from 'react';
+
+
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ShieldCheck, ArrowRight, ArrowLeft, Eye, EyeOff, User, Send } from 'lucide-react';
@@ -254,31 +256,37 @@ const LoginPage = () => {
   // State Form
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState(''); // State Nama
+  const [name, setName] = useState(''); 
   const [otp, setOtp] = useState('');
   
   // State UI
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState('login'); // 'login' | 'register' | 'otp' | 'forgot'
+  const [view, setView] = useState('login'); 
   const [showPassword, setShowPassword] = useState(false);
+
+  // --- PERBAIKAN 1: PAKSA RESET SAAT HALAMAN DIBUKA ---
+  // Ini berguna saat User Logout dan kembali ke halaman ini, form dipastikan bersih.
+  useEffect(() => {
+    setEmail('');
+    setPassword('');
+    setOtp('');
+    setName('');
+  }, []); // [] artinya jalan sekali saat komponen dimuat (mount)
 
   // --- ACTIONS ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-        // 1. Proses Login
         await login(email, password);
         
-        // 2. KOSONGKAN FORM SETELAH SUKSES (Sesuai Permintaan)
+        // Kosongkan state sebelum pindah (Opsional, karena useEffect di atas sudah handle saat balik lagi)
         setEmail('');
         setPassword('');
 
-        // 3. Pindah Halaman
         navigate('/'); 
     } catch (error) {
         alert("Gagal Login: " + error.message);
-        // Opsional: Kosongkan password jika gagal agar user mengetik ulang
         setPassword(''); 
     } finally {
         setLoading(false);
@@ -289,7 +297,6 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-        // Kirim nama juga
         await register(email, password, name);
         setView('otp');
         alert(`Halo ${name}, kode OTP telah dikirim ke email Anda.`);
@@ -306,10 +313,7 @@ const LoginPage = () => {
     try {
         await verifyOtp(email, otp);
         alert("Verifikasi Berhasil! Anda telah login.");
-        
-        // Kosongkan form OTP juga biar bersih
         setOtp('');
-        
         navigate('/'); 
     } catch (error) {
         alert("Kode Salah: " + error.message);
@@ -324,10 +328,7 @@ const LoginPage = () => {
       try {
           await sendPasswordReset(email);
           alert("Link reset password telah dikirim ke email. Cek Inbox/Spam.");
-          
-          // Kosongkan email setelah kirim link
           setEmail('');
-          
           setView('login');
       } catch (error) {
           alert("Gagal kirim link: " + error.message);
@@ -363,13 +364,17 @@ const LoginPage = () => {
 
         {/* --- FORM LOGIN --- */}
         {view === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4 relative z-10">
+            // PERBAIKAN 2: Tambah autoComplete="off" di form
+            <form onSubmit={handleLogin} className="space-y-4 relative z-10" autoComplete="off">
                 <div className="relative">
                     <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
                     <input 
                         type="email" required placeholder="Email Anda"
                         className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                         value={email} onChange={e => setEmail(e.target.value)}
+                        // PERBAIKAN 3: Matikan autocomplete email
+                        autoComplete="off"
+                        name="email_login_no_autofill" 
                     />
                 </div>
                 
@@ -380,6 +385,9 @@ const LoginPage = () => {
                         required placeholder="Password"
                         className="w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                         value={password} onChange={e => setPassword(e.target.value)}
+                        // PERBAIKAN 4: Trik 'new-password' agar browser bingung dan tidak isi password lama
+                        autoComplete="new-password"
+                        name="password_login_no_autofill"
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-blue-600 transition">
                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -404,14 +412,14 @@ const LoginPage = () => {
 
         {/* --- FORM REGISTER --- */}
         {view === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4 relative z-10">
-                 {/* Input Nama */}
+            <form onSubmit={handleRegister} className="space-y-4 relative z-10" autoComplete="off">
                  <div className="relative">
                     <User className="absolute left-3 top-3 text-gray-400" size={20} />
                     <input 
                         type="text" required placeholder="Nama Lengkap"
                         className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 capitalize"
                         value={name} onChange={e => setName(e.target.value)}
+                        autoComplete="off"
                     />
                 </div>
 
@@ -421,6 +429,7 @@ const LoginPage = () => {
                         type="email" required placeholder="Email Baru"
                         className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                         value={email} onChange={e => setEmail(e.target.value)}
+                        autoComplete="off"
                     />
                 </div>
                 
@@ -431,6 +440,7 @@ const LoginPage = () => {
                         required minLength={6} placeholder="Buat Password"
                         className="w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                         value={password} onChange={e => setPassword(e.target.value)}
+                        autoComplete="new-password"
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-blue-600 transition">
                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -449,13 +459,14 @@ const LoginPage = () => {
 
         {/* --- FORM FORGOT PASSWORD --- */}
         {view === 'forgot' && (
-            <form onSubmit={handleForgot} className="space-y-4 relative z-10">
+            <form onSubmit={handleForgot} className="space-y-4 relative z-10" autoComplete="off">
                  <div className="relative">
                     <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
                     <input 
                         type="email" required placeholder="Email Terdaftar"
                         className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
                         value={email} onChange={e => setEmail(e.target.value)}
+                        autoComplete="off"
                     />
                 </div>
 
@@ -471,13 +482,14 @@ const LoginPage = () => {
 
         {/* --- FORM OTP --- */}
         {view === 'otp' && (
-            <form onSubmit={handleVerify} className="space-y-4 relative z-10">
+            <form onSubmit={handleVerify} className="space-y-4 relative z-10" autoComplete="off">
                 <div className="relative">
                     <ShieldCheck className="absolute left-3 top-3 text-green-500" size={20} />
                     <input 
                         type="text" required placeholder="Kode OTP (Cek Email)"
                         className="w-full pl-10 pr-4 py-3 border-2 border-green-100 rounded-xl focus:ring-2 focus:ring-green-500 outline-none bg-green-50 text-lg font-bold tracking-widest text-center text-green-800"
                         value={otp} onChange={e => setOtp(e.target.value)}
+                        autoComplete="off"
                     />
                 </div>
 
