@@ -1,11 +1,12 @@
 
+// //============================================================================
 // import React, { useState, useEffect, useRef } from 'react';
 // import { useSearchParams } from 'react-router-dom';
 // import { supabase } from '../supabaseClient';
 // import { useAuth } from '../AuthProvider'; 
 // import Scanner from '../components/Scanner';
 // import ProductModal from '../components/ProductModal';
-// import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp } from 'lucide-react';
+// import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X } from 'lucide-react';
 
 // const ManagePage = () => {
 //   const { user } = useAuth(); 
@@ -78,7 +79,6 @@
 //     const isUpdate = !isVariantMode && currentProduct && currentProduct.id;
 //     let error;
 
-//     // HAPUS UNIT DARI PAYLOAD AGAR TIDAK ERROR
 //     const payload = {
 //         sku: formData.sku,
 //         item_name: formData.item_name,
@@ -138,24 +138,21 @@
 //   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
 //   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-//   // --- 5. EXPORT CSV (SESUAIKAN DENGAN GAMBAR EXCEL) ---
+//   // --- 5. EXPORT CSV ---
 //   const handleExport = () => { 
 //       if (products.length === 0) return alert("Data kosong!");
       
-//       // Header disesuaikan dengan gambar Excel Anda (7 Kolom)
 //       const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
       
 //       const rows = products.map(item => {
 //         const category = `"${item.category || ''}"`;
 //         const sku = `"${item.sku || ''}"`; 
-//         // Kolom Unit DIHAPUS agar sesuai gambar
 //         const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
 //         const brand = `"${item.brand_name || ''}"`;
 //         const variant = `"${item.variant_name || ''}"`;
 //         const price = item.price || 0;
 //         const wholesale = item.wholesale_price || 0;
         
-//         // Urutan: Category, SKU, Name, Brand, Variant, Price, Wholesale
 //         return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
 //       });
 
@@ -170,7 +167,7 @@
 //       document.body.removeChild(link);
 //   };
 
-//   // --- 6. IMPORT CSV (SESUAIKAN PEMBACAAN KOLOM) ---
+//   // --- 6. IMPORT CSV ---
 //   const handleImportClick = () => { 
 //       if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
 //           fileInputRef.current.click(); 
@@ -204,28 +201,22 @@
 //             result.push(current.trim()); return result;
 //         };
 
-//         // Mulai loop (skip header baris 0)
 //         for (let i = 1; i < lines.length; i++) {
 //             const line = lines[i].trim(); if (!line) continue;
 //             const columns = parseCSVLine(line);
             
-//             // Kita butuh minimal 7 kolom sesuai gambar Excel
-//             // 0:Category, 1:SKU, 2:Name, 3:Brand, 4:Variant, 5:Price, 6:Wholesale
 //             if (columns.length >= 6) { 
 //                 const clean = (str) => str ? str.replace(/^"|"$/g, '').trim() : '';
                 
 //                 const category = clean(columns[0]); 
 //                 let sku = clean(columns[1]); 
-                
-//                 // Urutan Baru sesuai gambar Excel:
-//                 const item_name = clean(columns[2]); // Kolom ke-3
-//                 const brand_name = clean(columns[3]); // Kolom ke-4
-//                 const variant_name = clean(columns[4]); // Kolom ke-5
+//                 const item_name = clean(columns[2]); 
+//                 const brand_name = clean(columns[3]); 
+//                 const variant_name = clean(columns[4]);
                 
 //                 let priceStr = clean(columns[5]).replace(/[^0-9.]/g, ''); 
 //                 const price = parseFloat(priceStr) || 0;
 
-//                 // Ambil harga grosir (kolom ke-7 / index 6)
 //                 let wholesaleStr = columns[6] ? clean(columns[6]).replace(/[^0-9.]/g, '') : '0';
 //                 const wholesale_price = parseFloat(wholesaleStr) || 0;
                 
@@ -236,7 +227,6 @@
 //                         user_id: user.id, 
 //                         category, 
 //                         sku: String(sku), 
-//                         // TIDAK ADA UNIT
 //                         item_name, 
 //                         brand_name, 
 //                         variant_name, 
@@ -248,11 +238,9 @@
 //         }
 
 //         if (dataToInsert.length > 0) {
-//             // Hapus data lama milik user ini saja
 //             const { error: deleteError } = await supabase.from('products').delete().eq('user_id', user.id); 
 //             if (deleteError) throw deleteError;
 
-//             // Insert data baru
 //             const { error: insertError } = await supabase.from('products').insert(dataToInsert);
 //             if (insertError) throw insertError;
             
@@ -268,14 +256,28 @@
 //       }
 //   };
 
-//   // --- UI HELPERS ---
-//   const handleScanSearch = (sku) => { setSearchQuery(sku); setShowScanner(false); alert(`🔍 Mencari SKU: ${sku}`); };
-//   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+//   // --- 8. UI HELPERS ---
+//   const handleScanSearch = (sku) => { 
+//       setSearchQuery(sku); 
+//       setShowScanner(false); 
+//       alert(`🔍 Mencari SKU: ${sku}`); 
+//   };
   
-//   const filteredProducts = products.filter(item => 
-//     (item.item_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-//     (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-//   );
+//   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+//   const clearSearch = () => { setSearchQuery(''); }; 
+
+//   // --- LOGIKA FILTER PENCARIAN (KHUSUS SKU & BRAND) ---
+//   const filteredProducts = products.filter(item => {
+//     const query = searchQuery.toLowerCase().trim();
+//     if (!query) return true; // Tampilkan semua jika kosong
+
+//     // Ambil data
+//     const sku = (item.sku || '').toLowerCase();
+//     const brand = (item.brand_name || '').toLowerCase();
+
+//     // HANYA CEK SKU ATAU BRAND (Nama Barang diabaikan)
+//     return sku.includes(query) || brand.includes(query);
+//   });
 
 //   return (
 //     <div className="pb-24 relative">
@@ -319,10 +321,18 @@
 //         <div className="relative mb-4">
 //           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
 //           <input 
-//             type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-//             placeholder="Cari Nama atau SKU..."
+//             type="text" 
+//             value={searchQuery} 
+//             onChange={(e) => setSearchQuery(e.target.value)}
+//             // Placeholder diupdate agar sesuai
+//             placeholder="Cari SKU atau Brand..."
 //             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
 //           />
+//           {searchQuery && (
+//              <button onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
+//                 <X size={16} />
+//              </button>
+//           )}
 //           <button onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
 //         </div>
 
@@ -335,9 +345,17 @@
 //                 <div className="flex-1">
 //                   <div className="font-bold text-gray-800">{item.item_name}</div>
 //                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
-//                     <span className="bg-gray-200 px-1.5 py-0.5 rounded text-[10px]">SKU: {item.sku}</span>
+//                     {/* Highlight SKU jika dicari */}
+//                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${searchQuery && item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-200'}`}>
+//                         SKU: {item.sku}
+//                     </span>
 //                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
-//                     {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
+//                     {/* Highlight Brand jika dicari */}
+//                     {item.brand_name && item.brand_name !== '-' && (
+//                         <span className={`px-1.5 py-0.5 rounded text-[10px] border ${searchQuery && item.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+//                             {item.brand_name}
+//                         </span>
+//                     )}
 //                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
 //                   </div>
                   
@@ -361,7 +379,7 @@
 //                 </div>
 //               </div>
 //             ))}
-//             {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? "Barang tidak ditemukan." : "Data kosong."}</p>}
+//             {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada Brand/SKU: "${searchQuery}"` : "Data kosong."}</p>}
 //           </div>
 //         )}
 //       </div>
@@ -383,7 +401,8 @@
 
 // export default ManagePage;
 
-//============================================================================
+//====================================================================================================================
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -391,6 +410,9 @@ import { useAuth } from '../AuthProvider';
 import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal';
 import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X } from 'lucide-react';
+
+// 1. IMPORT MODAL
+import ConfirmationModal from '../components/ConfirmationModal'; 
 
 const ManagePage = () => {
   const { user } = useAuth(); 
@@ -405,7 +427,16 @@ const ManagePage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const fileInputRef = useRef(null);
 
-  // --- 1. LOGIKA INIT & URL PARAM ---
+  // --- 2. STATE KONFIGURASI MODAL KONFIRMASI ---
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    type: null, // 'DELETE' atau 'IMPORT'
+    title: '',
+    message: '',
+    data: null // Menyimpan ID untuk delete
+  });
+
+  // --- LOGIKA INIT & URL PARAM ---
   useEffect(() => {
     if (user) {
         fetchProducts();
@@ -418,7 +449,7 @@ const ManagePage = () => {
     }
   }, [searchParams, user]);
 
-  // --- 2. FETCH DATA ---
+  // --- FETCH DATA ---
   const fetchProducts = async () => {
     if (!user) return;
     setLoading(true);
@@ -455,7 +486,7 @@ const ManagePage = () => {
     }
   };
 
-  // --- 3. SAVE PRODUCT (MANUAL) ---
+  // --- SAVE PRODUCT (MANUAL) ---
   const handleSaveProduct = async (formData, isVariantMode = false) => {
     if (!user) return alert("Sesi habis. Silakan login ulang.");
     setLoading(true);
@@ -504,25 +535,56 @@ const ManagePage = () => {
     }
   };
 
-  // --- 4. HAPUS DATA ---
-  const handleDelete = async (id, name) => {
+  // --- 3. PEMICU MODAL DELETE ---
+  const triggerDelete = (id, name) => {
     if (!user) return;
-    if (window.confirm(`Yakin hapus "${name}"?`)) {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+    setModalConfig({
+        isOpen: true,
+        type: 'DELETE',
+        title: 'Hapus Produk?',
+        message: `Apakah Anda yakin ingin menghapus "${name}"? Data yang dihapus tidak dapat dikembalikan.`,
+        data: { id }
+    });
+  };
 
-      if (error) alert('Gagal hapus: ' + error.message);
-      else setProducts(products.filter(item => item.id !== id));
-    }
+  // --- 4. PEMICU MODAL IMPORT ---
+  const triggerImport = () => {
+    setModalConfig({
+        isOpen: true,
+        type: 'IMPORT',
+        title: 'Import Data Excel?',
+        message: 'PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda di database dan menggantinya dengan data baru. Lanjutkan?',
+        data: null
+    });
+  };
+
+  // --- 5. EKSEKUSI AKSI SETELAH KONFIRMASI ---
+  const handleConfirmAction = async () => {
+      // Jika tipe DELETE
+      if (modalConfig.type === 'DELETE') {
+          const { id } = modalConfig.data;
+          const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id);
+
+          if (error) alert('Gagal hapus: ' + error.message);
+          else setProducts(products.filter(item => item.id !== id));
+      } 
+      // Jika tipe IMPORT
+      else if (modalConfig.type === 'IMPORT') {
+          fileInputRef.current.click(); // Buka file dialog
+      }
+
+      // Tutup Modal
+      setModalConfig({ ...modalConfig, isOpen: false });
   };
 
   const handleOpenAdd = () => { setCurrentProduct(null); setIsModalOpen(true); };
   const handleOpenEdit = (item) => { setCurrentProduct(item); setIsModalOpen(true); };
 
-  // --- 5. EXPORT CSV ---
+  // --- EXPORT CSV ---
   const handleExport = () => { 
       if (products.length === 0) return alert("Data kosong!");
       
@@ -551,13 +613,7 @@ const ManagePage = () => {
       document.body.removeChild(link);
   };
 
-  // --- 6. IMPORT CSV ---
-  const handleImportClick = () => { 
-      if (window.confirm("PERINGATAN: Import ini akan MENGHAPUS SEMUA data lama Anda. Lanjutkan?")) {
-          fileInputRef.current.click(); 
-      }
-  };
-  
+  // --- IMPORT CSV LOGIC ---
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -640,7 +696,7 @@ const ManagePage = () => {
       }
   };
 
-  // --- 8. UI HELPERS ---
+  // --- UI HELPERS ---
   const handleScanSearch = (sku) => { 
       setSearchQuery(sku); 
       setShowScanner(false); 
@@ -650,16 +706,14 @@ const ManagePage = () => {
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const clearSearch = () => { setSearchQuery(''); }; 
 
-  // --- LOGIKA FILTER PENCARIAN (KHUSUS SKU & BRAND) ---
   const filteredProducts = products.filter(item => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return true; // Tampilkan semua jika kosong
+    if (!query) return true; 
 
-    // Ambil data
     const sku = (item.sku || '').toLowerCase();
     const brand = (item.brand_name || '').toLowerCase();
 
-    // HANYA CEK SKU ATAU BRAND (Nama Barang diabaikan)
+    // HANYA CEK SKU ATAU BRAND (Sesuai kode sebelumnya)
     return sku.includes(query) || brand.includes(query);
   });
 
@@ -680,7 +734,9 @@ const ManagePage = () => {
         <div className="flex flex-col gap-2 mb-6">
           <div className="flex gap-2">
             <button onClick={handleExport} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow"><Download size={18} /> Export Excel</button>
-            <button onClick={handleImportClick} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
+            
+            {/* Ganti onClick ke triggerImport */}
+            <button onClick={triggerImport} className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 shadow"><Upload size={18} /> Import Excel</button>
           </div>
           
           <button 
@@ -708,7 +764,6 @@ const ManagePage = () => {
             type="text" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)}
-            // Placeholder diupdate agar sesuai
             placeholder="Cari SKU atau Brand..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
@@ -729,12 +784,10 @@ const ManagePage = () => {
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
-                    {/* Highlight SKU jika dicari */}
                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${searchQuery && item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-200'}`}>
                         SKU: {item.sku}
                     </span>
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
-                    {/* Highlight Brand jika dicari */}
                     {item.brand_name && item.brand_name !== '-' && (
                         <span className={`px-1.5 py-0.5 rounded text-[10px] border ${searchQuery && item.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
                             {item.brand_name}
@@ -759,7 +812,8 @@ const ManagePage = () => {
 
                 <div className="flex gap-2 ml-2">
                   <button onClick={() => handleOpenEdit(item)} className="bg-blue-100 text-blue-600 p-2 rounded-full hover:bg-blue-200"><Edit size={18} /></button>
-                  <button onClick={() => handleDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
+                  {/* Ganti onClick ke triggerDelete */}
+                  <button onClick={() => triggerDelete(item.id, item.item_name)} className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"><Trash2 size={18} /></button>
                 </div>
               </div>
             ))}
@@ -769,6 +823,15 @@ const ManagePage = () => {
       </div>
 
       <button onClick={scrollToTop} className="fixed bottom-24 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 z-40 transition-all hover:scale-110 active:scale-95"><ArrowUp size={24} /></button>
+
+      {/* --- 6. RENDER MODAL KONFIRMASI --- */}
+      <ConfirmationModal 
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={handleConfirmAction}
+        title={modalConfig.title}
+        message={modalConfig.message}
+      />
 
       <ProductModal 
         isOpen={isModalOpen} 
