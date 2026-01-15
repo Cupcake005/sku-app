@@ -81,7 +81,6 @@ const UpdatePassword = () => {
 
       if (!session) {
         // Jika tidak ada sesi (orang iseng ketik URL), tendang ke login
-        alert("Akses ditolak! Anda harus login atau menggunakan link reset password.");
         navigate('/login', { replace: true });
       } else {
         // Jika sesi valid, izinkan akses
