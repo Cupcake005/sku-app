@@ -648,23 +648,19 @@ const ManagePage = () => {
   };
   
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const clearSearch = () => { setSearchQuery(''); }; // Helper untuk tombol X
+  const clearSearch = () => { setSearchQuery(''); }; 
 
-  // --- LOGIKA FILTER PENCARIAN (DIPERBAIKI) ---
+  // --- LOGIKA FILTER PENCARIAN (KHUSUS SKU & BRAND) ---
   const filteredProducts = products.filter(item => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true; // Tampilkan semua jika kosong
 
-    // Ambil data (handle null dengan string kosong)
-    const name = (item.item_name || '').toLowerCase();
+    // Ambil data
     const sku = (item.sku || '').toLowerCase();
-    
-    // Cek apakah query ada di salah satu kolom
-    return name.includes(query) || 
-           sku.includes(query) || 
-           brand.includes(query) || 
-           variant.includes(query) || 
-           category.includes(query);
+    const brand = (item.brand_name || '').toLowerCase();
+
+    // HANYA CEK SKU ATAU BRAND (Nama Barang diabaikan)
+    return sku.includes(query) || brand.includes(query);
   });
 
   return (
@@ -712,10 +708,10 @@ const ManagePage = () => {
             type="text" 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Nama, SKU, Brand, Varian..."
+            // Placeholder diupdate agar sesuai
+            placeholder="Cari SKU atau Brand..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          {/* Tombol Clear Search (X) jika ada teks */}
           {searchQuery && (
              <button onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
                 <X size={16} />
@@ -733,9 +729,17 @@ const ManagePage = () => {
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
                   <div className="text-xs text-gray-500 flex flex-wrap gap-1 items-center mt-1">
-                    <span className="bg-gray-200 px-1.5 py-0.5 rounded text-[10px]">SKU: {item.sku}</span>
+                    {/* Highlight SKU jika dicari */}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${searchQuery && item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-200'}`}>
+                        SKU: {item.sku}
+                    </span>
                     <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100">{item.category}</span>
-                    {item.brand_name && item.brand_name !== '-' && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded text-[10px] border border-purple-100">{item.brand_name}</span>}
+                    {/* Highlight Brand jika dicari */}
+                    {item.brand_name && item.brand_name !== '-' && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${searchQuery && item.brand_name.toLowerCase().includes(searchQuery.toLowerCase()) ? 'bg-yellow-200 text-yellow-800 font-bold border-yellow-300' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                            {item.brand_name}
+                        </span>
+                    )}
                     {item.variant_name && <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded text-[10px] border border-orange-100 font-medium">{item.variant_name}</span>}
                   </div>
                   
@@ -759,7 +763,7 @@ const ManagePage = () => {
                 </div>
               </div>
             ))}
-            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada hasil untuk "${searchQuery}"` : "Data kosong."}</p>}
+            {filteredProducts.length === 0 && <p className="text-center text-gray-400 mt-10">{searchQuery ? `Tidak ada Brand/SKU: "${searchQuery}"` : "Data kosong."}</p>}
           </div>
         )}
       </div>
