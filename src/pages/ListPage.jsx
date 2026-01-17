@@ -278,10 +278,38 @@ const ListPage = () => {
   });
   const [notifyModal, setNotifyModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
-  // --- 2. SINKRONISASI DATA & LOGIKA FILTER ---
+  // Helper Notifikasi
+  const showNotify = (type, title, message) => {
+    setNotifyModal({ isOpen: true, type, title, message });
+  };
+
+  // --- 2. HANDLER VALIDASI TANGGAL (BARU) ---
+  const handleStartDateChange = (e) => {
+      const newStart = e.target.value;
+      
+      // Jika user memajukan tanggal mulai melebihi tanggal akhir yg sudah dipilih
+      if (endDate && newStart > endDate) {
+          showNotify('error', 'Tanggal Tidak Valid', 'Tanggal Mulai tidak boleh melebihi Tanggal Akhir. Tanggal Akhir akan direset.');
+          setEndDate(''); // Reset tanggal akhir biar user pilih ulang
+      }
+      setStartDate(newStart);
+  };
+
+  const handleEndDateChange = (e) => {
+      const newEnd = e.target.value;
+
+      // Validasi: Akhir tidak boleh kurang dari Mulai
+      if (startDate && newEnd < startDate) {
+          showNotify('error', 'Tanggal Tidak Valid', 'Tanggal Akhir tidak boleh lebih kecil dari Tanggal Mulai!');
+          return; // Jangan update state, biarkan tetap kosong/lama
+      }
+      setEndDate(newEnd);
+  };
+
+  // --- 3. SINKRONISASI DATA & LOGIKA FILTER ---
   useEffect(() => {
-    // Fungsi untuk menjalankan filter
     const applyFilter = () => {
+        // Hanya filter jika KEDUA tanggal terisi
         if (!startDate || !endDate) {
             setFilteredList(exportList);
             setIsFilterActive(false);
@@ -289,10 +317,10 @@ const ListPage = () => {
         }
 
         const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0); // Set ke awal hari
+        start.setHours(0, 0, 0, 0); 
 
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Set ke akhir hari
+        end.setHours(23, 59, 59, 999); 
 
         const result = exportList.filter(item => {
             const itemDate = new Date(item.created_at);
@@ -303,10 +331,7 @@ const ListPage = () => {
         setIsFilterActive(true);
     };
 
-    // Jalankan filter setiap kali exportList berubah (misal ada yg dihapus) 
-    // atau tanggal filter berubah (jika tombol terapkan ditekan/otomatis)
     applyFilter();
-
   }, [exportList, startDate, endDate]); 
 
   // --- HANDLER RESET FILTER ---
@@ -317,7 +342,7 @@ const ListPage = () => {
       setIsFilterActive(false);
   };
 
-  // --- HANDLER MODAL ---
+  // --- HANDLER MODAL (Delete Logic) ---
   const triggerClearAll = () => {
     if (filteredList.length === 0) return;
     setModalConfig({
@@ -347,36 +372,29 @@ const ListPage = () => {
 
   const handleConfirmAction = () => {
     if (modalConfig.type === 'DELETE_ALL') {
-        // Jika filter aktif, kita harus hapus satu per satu item yang terfilter (karena clearExportList biasanya hapus semua tabel)
-        // Atau jika backend mendukung delete by range, itu lebih baik. 
-        // Untuk amannya, di sini kita panggil clearExportList() HANYA JIKA tidak ada filter.
-        // Jika ada filter, logika hapus massal berdasarkan filter agak kompleks di client-side array.
-        
         if (isFilterActive) {
-            // Hapus item yang ada di filteredList saja
             filteredList.forEach(item => removeFromExportList(item.id));
-            setNotifyModal({ isOpen: true, type: 'success', title: 'Dihapus', message: 'Data yang difilter berhasil dihapus.' });
+            showNotify('success', 'Dihapus', 'Data yang difilter berhasil dihapus.');
         } else {
             clearExportList();
-            setNotifyModal({ isOpen: true, type: 'success', title: 'Bersih', message: 'Semua data berhasil dihapus.' });
+            showNotify('success', 'Bersih', 'Semua data berhasil dihapus.');
         }
-
     } else if (modalConfig.type === 'DELETE_ONE') {
         removeFromExportList(modalConfig.id);
     }
     setModalConfig({ ...modalConfig, isOpen: false });
   };
 
-  // --- 3. LOGIKA DOWNLOAD (BERDASARKAN FILTERED LIST) ---
+  // --- LOGIKA DOWNLOAD ---
   const handleDownload = () => {
     if (filteredList.length === 0) {
-        setNotifyModal({ isOpen: true, type: 'info', title: 'Data Kosong', message: 'Tidak ada data untuk diexport.' });
+        showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
         return;
     }
 
     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price,Date Scanned";
 
-    const rows = filteredList.map(item => { // Ganti exportList dengan filteredList
+    const rows = filteredList.map(item => { 
       const category = `"${item.category || ''}"`;
       const sku = `"${item.sku || '-'}"`; 
       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
@@ -395,7 +413,6 @@ const ListPage = () => {
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
     
-    // Nama file dinamis
     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
     link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
     
@@ -427,24 +444,31 @@ const ListPage = () => {
                 <Filter size={12} /> Filter Tanggal
             </div>
             <div className="flex gap-2">
+                
+                {/* INPUT TANGGAL MULAI */}
                 <div className="flex-1 relative">
                     <input 
                         type="date" 
                         value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
+                        onChange={handleStartDateChange} // Pakai handler baru
+                        max={endDate} // UI UX: Gak bisa pilih tanggal setelah End Date
                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
+                
                 <span className="self-center text-gray-400">-</span>
+                
+                {/* INPUT TANGGAL AKHIR */}
                 <div className="flex-1 relative">
                     <input 
                         type="date" 
                         value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
+                        onChange={handleEndDateChange} // Pakai handler baru
+                        min={startDate} // UI UX: Gak bisa pilih tanggal sebelum Start Date
                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                {/* Tombol Reset muncul jika filter aktif */}
+
                 {isFilterActive && (
                     <button 
                         onClick={handleResetFilter}
@@ -480,7 +504,7 @@ const ListPage = () => {
           <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-white mt-4">
             <AlertCircle size={48} className="mx-auto text-gray-300 mb-3" />
             <p className="text-gray-500 font-medium">
-                {isFilterActive ? 'Tidak ada data pada tanggal ini' : 'List Masih Kosong'}
+                {isFilterActive ? 'Tidak ada data pada rentang tanggal ini' : 'List Masih Kosong'}
             </p>
             {isFilterActive ? (
                 <button onClick={handleResetFilter} className="mt-4 text-blue-600 font-bold text-xs hover:underline">
@@ -513,6 +537,11 @@ const ListPage = () => {
                         {item.brand_name && item.brand_name !== '-' && (
                             <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 rounded border border-purple-100">
                                 {item.brand_name}
+                            </span>
+                        )}
+                        {item.variant_name && (
+                            <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 rounded border border-orange-100">
+                                {item.variant_name}
                             </span>
                         )}
                     </div>
