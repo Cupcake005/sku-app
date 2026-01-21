@@ -455,10 +455,9 @@ const ManagePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State Data
-  const [products, setProducts] = useState([]); // Hanya menyimpan data yang TAMPIL
+  const [products, setProducts] = useState([]); // Menyimpan SEMUA data
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false); // Mode pencarian aktif/tidak
   
   // --- STATE MODAL & SCANNER ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -478,11 +477,10 @@ const ManagePage = () => {
     setNotifyModal({ ...notifyModal, isOpen: false });
   };
 
-  // --- 1. INIT LOAD (HANYA 50 DATA TERBARU) ---
-  // Ini bikin aplikasi ringan karena tidak load ribuan data di awal
+  // --- 1. INIT LOAD (AMBIL SEMUA DATA) ---
   useEffect(() => {
     if (user) {
-        fetchRecentProducts();
+        fetchAllProducts();
     }
     const skuFromUrl = searchParams.get('sku');
     if (skuFromUrl) {
@@ -491,71 +489,16 @@ const ManagePage = () => {
     }
   }, [searchParams, user]);
 
-  const fetchRecentProducts = async () => {
+  // Fungsi Fetch SEMUA Data (Looping > 1000)
+  const fetchAllProducts = async () => {
     if (!user) return;
     setLoading(true);
     try {
-        // Ambil 50 data terbaru saja untuk tampilan awal
-        const { data, error } = await supabase
-            .from('products')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(50);
-
-        if (error) throw error;
-        setProducts(data || []);
-        setIsSearching(false); // Reset mode search
-    } catch (error) {
-        console.error("Error fetching recent:", error);
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  // --- 2. LOGIKA PENCARIAN SERVER-SIDE (AKURAT) ---
-  // Mencari langsung ke DB berdasarkan SKU atau Nama
-  const handleSearch = async (e) => {
-      e?.preventDefault();
-      const query = searchQuery.trim();
-      
-      if (!query) {
-          fetchRecentProducts(); // Kembali ke tampilan awal jika kosong
-          return;
-      }
-
-      setLoading(true);
-      setIsSearching(true);
-
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('user_id', user.id) // Pastikan hanya data user ini
-          // Filter: Nama ILIKE query OR SKU ILIKE query
-          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`)
-          .limit(100); // Batasi hasil pencarian agar UI tidak berat
-
-        if (error) throw error;
-        setProducts(data || []);
-      } catch (error) {
-        showNotify('error', 'Gagal Mencari', error.message);
-      } finally {
-        setLoading(false);
-      }
-  };
-
-  // --- 3. LOGIKA EKSPOR SEMUA DATA (LOOPING) ---
-  // Fungsi ini khusus mengambil SEMUA data hanya saat tombol diklik
-  const handleExport = async () => { 
-      setLoading(true); // Tampilkan indikator loading karena ini mungkin agak lama
-      try {
         let allData = [];
         let from = 0;
         const step = 1000; 
         let more = true;
 
-        // Loop fetching sampai data habis
         while (more) {
             const { data, error } = await supabase
                 .from('products')
@@ -574,40 +517,55 @@ const ManagePage = () => {
                 more = false;
             }
         }
+        setProducts(allData); // Simpan semua ke state
+    } catch (error) {
+        console.error("Error fetching products:", error);
+        showNotify('error', 'Gagal Load Data', error.message);
+    } finally {
+        setLoading(false);
+    }
+  };
 
-        if (allData.length === 0) {
-            showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
-            return;
-        }
+  // --- 2. LOGIKA PENCARIAN CLIENT-SIDE (CEPAT) ---
+  // Karena semua data sudah diload, kita filter di sini saja (tidak perlu request server lagi)
+  const filteredProducts = products.filter(item => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true; 
+
+    const itemName = (item.item_name || '').toLowerCase();
+    const sku = (item.sku || '').toLowerCase();
+
+    // Hanya Nama atau SKU
+    return itemName.includes(query) || sku.includes(query);
+  });
+
+  // --- EXPORT DATA (AMBIL DARI STATE SAJA) ---
+  const handleExport = () => { 
+      // Karena kita sudah punya 'products' (semua data), kita export langsung dari situ
+      // Tidak perlu fetch ulang biar cepat
+      if (products.length === 0) return showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
       
-        // Generate CSV
-        const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
-        const rows = allData.map(item => {
-            const category = `"${item.category || ''}"`;
-            const sku = `"${item.sku || ''}"`; 
-            const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
-            const brand = `"${item.brand_name || ''}"`;
-            const variant = `"${item.variant_name || ''}"`;
-            const price = item.price || 0;
-            const wholesale = item.wholesale_price || 0;
-            return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
-        });
+      const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+      const rows = products.map(item => { // Gunakan data dari state
+        const category = `"${item.category || ''}"`;
+        const sku = `"${item.sku || ''}"`; 
+        const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
+        const brand = `"${item.brand_name || ''}"`;
+        const variant = `"${item.variant_name || ''}"`;
+        const price = item.price || 0;
+        const wholesale = item.wholesale_price || 0;
+        return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+      });
 
-        const csvContent = [header, ...rows].join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Database_Toko_${new Date().toISOString().slice(0,10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-      } catch (error) {
-          showNotify('error', 'Gagal Export', error.message);
-      } finally {
-          setLoading(false);
-      }
+      const csvContent = [header, ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Database_Toko_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   // --- SAVE PRODUCT ---
@@ -649,11 +607,7 @@ const ManagePage = () => {
       setIsModalOpen(false);
       setCurrentProduct(null);
       setSearchParams({});
-      
-      // Jika dalam mode search, kita refresh search-nya agar data baru muncul (jika sesuai keyword)
-      // Jika mode biasa, refresh recent products
-      if (isSearching) handleSearch();
-      else fetchRecentProducts();
+      fetchAllProducts(); // Refresh list
     }
   };
 
@@ -746,7 +700,7 @@ const ManagePage = () => {
             if (insertError) throw insertError;
             
             showNotify('success', 'Import Berhasil', `${dataToInsert.length} data baru berhasil dimasukkan.`);
-            fetchRecentProducts(); 
+            fetchAllProducts(); 
         } else { 
             showNotify('info', 'File Kosong', "File kosong atau format tidak sesuai.");
         }
@@ -761,36 +715,11 @@ const ManagePage = () => {
   const handleScanSearch = (sku) => { 
       setSearchQuery(sku); 
       setShowScanner(false); 
-      // Panggil fungsi search otomatis saat scan
-      // Karena setSearchQuery async, kita panggil fungsi search manual dengan parameter
-      performDirectSearch(sku);
-  };
-
-  // Fungsi helper untuk search langsung tanpa nunggu state update (buat scanner)
-  const performDirectSearch = async (val) => {
-      setLoading(true);
-      setIsSearching(true);
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('user_id', user.id)
-          .or(`item_name.ilike.%${val}%,sku.ilike.%${val}%`) // LOGIC SAMA DENGAN ATAS
-          .limit(50);
-        if (error) throw error;
-        setProducts(data || []);
-      } catch (error) {
-        showNotify('error', 'Error', error.message);
-      } finally {
-        setLoading(false);
-      }
+      showNotify('info', 'Scan Berhasil', `Mencari SKU: ${sku}`);
   };
   
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const clearSearch = () => { 
-      setSearchQuery(''); 
-      fetchRecentProducts(); // Reset ke data awal
-  }; 
+  const clearSearch = () => { setSearchQuery(''); }; 
 
   return (
     <div className="pb-24 relative">
@@ -802,7 +731,7 @@ const ManagePage = () => {
             <div className="inline-flex items-center gap-2 mt-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                 <p className="text-xs font-bold text-blue-700">
-                    {isSearching ? `Hasil Pencarian: ${products.length}` : `50 Data Terbaru`}
+                    Total : {products.length} Produk
                 </p>
             </div>
         </div>
@@ -828,7 +757,7 @@ const ManagePage = () => {
           </div>
         )}
 
-        <form onSubmit={handleSearch} className="relative mb-4">
+        <div className="relative mb-4">
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
           <input 
             type="text" 
@@ -838,17 +767,19 @@ const ManagePage = () => {
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
           {searchQuery && (
-             <button type="button" onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
+             <button onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
                 <X size={16} />
              </button>
           )}
-          <button type="button" onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
-        </form>
+          <button onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
+        </div>
 
         {/* List Data */}
         {loading ? <p className="text-center py-10 text-gray-500 animate-pulse">Sedang memuat data...</p> : (
           <div className="space-y-3">
-            {products.map((item) => (
+            <div className="text-xs text-gray-400 mb-2 text-right">Menampilkan {filteredProducts.length} dari {products.length} data</div>
+            
+            {filteredProducts.map((item) => (
               <div key={item.id} className="border p-3 rounded-lg shadow-sm bg-gray-50 flex justify-between items-center hover:bg-gray-50 transition">
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
@@ -884,16 +815,11 @@ const ManagePage = () => {
               </div>
             ))}
             
-            {products.length === 0 && (
+            {filteredProducts.length === 0 && (
                 <div className="text-center py-10">
                     <p className="text-gray-400 mb-2">
-                        {isSearching ? `Tidak ada Nama/SKU: "${searchQuery}"` : "Data kosong."}
+                        {searchQuery ? `Tidak ada Nama/SKU: "${searchQuery}"` : "Data kosong."}
                     </p>
-                    {isSearching && (
-                        <button onClick={clearSearch} className="text-blue-600 font-bold text-sm hover:underline flex items-center justify-center gap-1 mx-auto">
-                            <RefreshCw size={14} /> Reset Pencarian
-                        </button>
-                    )}
                 </div>
             )}
           </div>
