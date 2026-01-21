@@ -227,8 +227,8 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
   const handleConfirm = () => {
     const modifiedProduct = {
         ...product,
-        price: parseFloat(priceNormal) || 0,          
-        wholesale_price: parseFloat(priceWholesale) || 0,
+        price: parseFloat(priceNormal),          
+        wholesale_price: parseFloat(priceWholesale),
     };
     onAddToExport(modifiedProduct);
   };
