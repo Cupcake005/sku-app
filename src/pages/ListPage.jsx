@@ -522,19 +522,20 @@ const ListPage = () => {
         return;
     }
 
-    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price,Date Scanned";
+    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Harga Grosir";
 
     const rows = filteredList.map(item => { 
       const category = `"${item.category || ''}"`;
-      const sku = `"${item.sku || '-'}"`; 
+      const sku = `"${item.sku || ''}"`; 
       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
-      const brand = `"${item.brand_name || '-'}"`; 
+      const brand = `"${item.brand_name || ''}"`; 
       const variant = `"${item.variant_name || ''}"`;
-      const price = item.price || 0;
-      const wholesale = item.wholesale_price || 0; 
-      const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
+      const price = item.price || '';
+      const wholesale = item.wholesale_price || ''; 
+    //   const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
 
-      return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
+    //   return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
+    return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
     });
 
     const csvContent = [header, ...rows].join("\n");
