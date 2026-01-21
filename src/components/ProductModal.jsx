@@ -457,7 +457,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick, setIsScan
         
         <form onSubmit={handleSubmit} className="space-y-3">
            <div>
-            <label className="text-xs font-bold text-gray-500">Nama Barang *</label>
+            <label className="text-xs font-bold text-gray-500">Nama Produk *</label>
             <input required name="item_name" className="w-full border p-2 rounded uppercase focus:ring-2 focus:ring-blue-500 outline-none" value={formData.item_name} onChange={handleChange} />
           </div>
           <div>
