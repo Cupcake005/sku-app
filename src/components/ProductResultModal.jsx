@@ -332,7 +332,7 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
             </div>
         )}
 
-        <button onClick={handleConfirm} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
+        <button onClick={handleConfirm} className="w-full bg-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
             <Plus size={20} /> Masukkan Ke List
         </button>
 
