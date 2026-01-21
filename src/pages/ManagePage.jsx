@@ -437,14 +437,13 @@
 ////===================================================================================================
 
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthProvider'; 
 import Scanner from '../components/Scanner';
 import ProductModal from '../components/ProductModal';
-import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X, RefreshCw } from 'lucide-react';
+import { Search, Trash2, Edit, ScanLine, Download, Upload, Plus, ArrowUp, X, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // IMPORT MODALS
 import ConfirmationModal from '../components/ConfirmationModal'; 
@@ -455,10 +454,14 @@ const ManagePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State Data
-  const [products, setProducts] = useState([]); // Menyimpan SEMUA data
+  const [products, setProducts] = useState([]); // Data yang ditampilkan (max 100)
+  const [totalProducts, setTotalProducts] = useState(0); // Total semua data di DB
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   
+  // State Pencarian
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
   // --- STATE MODAL & SCANNER ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null); 
@@ -477,10 +480,10 @@ const ManagePage = () => {
     setNotifyModal({ ...notifyModal, isOpen: false });
   };
 
-  // --- 1. INIT LOAD (AMBIL SEMUA DATA) ---
+  // --- 1. INIT LOAD (Hanya 100 Data Teratas + Hitung Total) ---
   useEffect(() => {
     if (user) {
-        fetchAllProducts();
+        fetchInitialData();
     }
     const skuFromUrl = searchParams.get('sku');
     if (skuFromUrl) {
@@ -489,16 +492,80 @@ const ManagePage = () => {
     }
   }, [searchParams, user]);
 
-  // Fungsi Fetch SEMUA Data (Looping > 1000)
-  const fetchAllProducts = async () => {
+  const fetchInitialData = async () => {
     if (!user) return;
     setLoading(true);
     try {
+        // 1. Ambil 100 data terbaru
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(100); // Batasi 100 agar ringan
+
+        if (error) throw error;
+        setProducts(data || []);
+
+        // 2. Hitung Total Semua Data (Tanpa download isinya, biar cepat)
+        const { count, error: countError } = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true }) // head: true artinya cuma hitung jumlah
+            .eq('user_id', user.id);
+
+        if (!countError) setTotalProducts(count || 0);
+
+        setIsSearching(false); 
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        showNotify('error', 'Gagal Load Data', error.message);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  // --- 2. LOGIKA PENCARIAN AKURAT (Server-Side) ---
+  const handleSearch = async (e) => {
+      e?.preventDefault();
+      const query = searchQuery.trim();
+      
+      if (!query) {
+          fetchInitialData(); // Reset jika kosong
+          return;
+      }
+
+      setLoading(true);
+      setIsSearching(true);
+
+      try {
+        // Cari di server biar akurat (meskipun data belum terload di halaman 1)
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('user_id', user.id)
+          .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) // Case-insensitive search
+          .limit(100); // Batasi hasil pencarian max 100
+
+        if (error) throw error;
+        setProducts(data || []);
+        setTotalProducts(data.length); // Update total sesuai hasil pencarian
+      } catch (error) {
+        showNotify('error', 'Gagal Mencari', error.message);
+      } finally {
+        setLoading(false);
+      }
+  };
+
+  // --- 3. EXPORT SEMUA DATA (Background Process) ---
+  const handleExport = async () => { 
+      setLoading(true); 
+      try {
         let allData = [];
         let from = 0;
         const step = 1000; 
         let more = true;
 
+        // Loop fetching sampai data habis
         while (more) {
             const { data, error } = await supabase
                 .from('products')
@@ -517,55 +584,39 @@ const ManagePage = () => {
                 more = false;
             }
         }
-        setProducts(allData); // Simpan semua ke state
-    } catch (error) {
-        console.error("Error fetching products:", error);
-        showNotify('error', 'Gagal Load Data', error.message);
-    } finally {
-        setLoading(false);
-    }
-  };
 
-  // --- 2. LOGIKA PENCARIAN CLIENT-SIDE (CEPAT) ---
-  // Karena semua data sudah diload, kita filter di sini saja (tidak perlu request server lagi)
-  const filteredProducts = products.filter(item => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true; 
-
-    const itemName = (item.item_name || '').toLowerCase();
-    const sku = (item.sku || '').toLowerCase();
-
-    // Hanya Nama atau SKU
-    return itemName.includes(query) || sku.includes(query);
-  });
-
-  // --- EXPORT DATA (AMBIL DARI STATE SAJA) ---
-  const handleExport = () => { 
-      // Karena kita sudah punya 'products' (semua data), kita export langsung dari situ
-      // Tidak perlu fetch ulang biar cepat
-      if (products.length === 0) return showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
+        if (allData.length === 0) {
+            showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
+            return;
+        }
       
-      const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
-      const rows = products.map(item => { // Gunakan data dari state
-        const category = `"${item.category || ''}"`;
-        const sku = `"${item.sku || ''}"`; 
-        const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
-        const brand = `"${item.brand_name || ''}"`;
-        const variant = `"${item.variant_name || ''}"`;
-        const price = item.price || 0;
-        const wholesale = item.wholesale_price || 0;
-        return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
-      });
+        const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Basic - Price,Wholesale Price";
+        const rows = allData.map(item => {
+            const category = `"${item.category || ''}"`;
+            const sku = `"${item.sku || ''}"`; 
+            const name = `"${(item.item_name || '').replace(/"/g, '""')}"`;
+            const brand = `"${item.brand_name || ''}"`;
+            const variant = `"${item.variant_name || ''}"`;
+            const price = item.price || 0;
+            const wholesale = item.wholesale_price || 0;
+            return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+        });
 
-      const csvContent = [header, ...rows].join("\n");
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", `Database_Toko_${new Date().toISOString().slice(0,10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const csvContent = [header, ...rows].join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Database_Toko_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+      } catch (error) {
+          showNotify('error', 'Gagal Export', error.message);
+      } finally {
+          setLoading(false);
+      }
   };
 
   // --- SAVE PRODUCT ---
@@ -599,15 +650,14 @@ const ManagePage = () => {
     if (error) {
       showNotify('error', 'Gagal Menyimpan', error.message);
     } else {
-      showNotify(
-          'success', 
-          'Berhasil', 
-          isVariantMode ? 'Varian baru berhasil dibuat!' : (isUpdate ? 'Produk berhasil diperbarui!' : 'Produk berhasil ditambahkan!')
-      );
+      showNotify('success', 'Berhasil', isUpdate ? 'Produk diperbarui!' : 'Produk ditambahkan!');
       setIsModalOpen(false);
       setCurrentProduct(null);
       setSearchParams({});
-      fetchAllProducts(); // Refresh list
+      
+      // Refresh Data (Cek apakah sedang search atau tidak)
+      if (isSearching) handleSearch();
+      else fetchInitialData();
     }
   };
 
@@ -635,6 +685,7 @@ const ManagePage = () => {
               showNotify('error', 'Gagal Hapus', error.message);
           } else {
               setProducts(products.filter(item => item.id !== id));
+              setTotalProducts(prev => prev - 1); // Kurangi counter total
           }
       } else if (modalConfig.type === 'IMPORT') {
           fileInputRef.current.click();
@@ -700,7 +751,7 @@ const ManagePage = () => {
             if (insertError) throw insertError;
             
             showNotify('success', 'Import Berhasil', `${dataToInsert.length} data baru berhasil dimasukkan.`);
-            fetchAllProducts(); 
+            fetchInitialData(); // Reset ulang data dan total
         } else { 
             showNotify('info', 'File Kosong', "File kosong atau format tidak sesuai.");
         }
@@ -715,11 +766,35 @@ const ManagePage = () => {
   const handleScanSearch = (sku) => { 
       setSearchQuery(sku); 
       setShowScanner(false); 
-      showNotify('info', 'Scan Berhasil', `Mencari SKU: ${sku}`);
+      // Search langsung tanpa nunggu user tekan enter
+      performDirectSearch(sku);
+  };
+
+  const performDirectSearch = async (val) => {
+      setLoading(true);
+      setIsSearching(true);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('user_id', user.id)
+          .or(`item_name.ilike.%${val}%,sku.ilike.%${val}%`)
+          .limit(100);
+        if (error) throw error;
+        setProducts(data || []);
+      } catch (error) {
+        showNotify('error', 'Error', error.message);
+      } finally {
+        setLoading(false);
+      }
   };
   
   const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const clearSearch = () => { setSearchQuery(''); }; 
+  
+  const clearSearch = () => { 
+      setSearchQuery(''); 
+      fetchInitialData(); // Kembali ke mode awal
+  }; 
 
   return (
     <div className="pb-24 relative">
@@ -731,7 +806,8 @@ const ManagePage = () => {
             <div className="inline-flex items-center gap-2 mt-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                 <p className="text-xs font-bold text-blue-700">
-                    Total : {products.length} Produk
+                    {/* Tampilkan Total Asli dari DB */}
+                    Total Data Tersimpan : {totalProducts.toLocaleString()} 
                 </p>
             </div>
         </div>
@@ -757,7 +833,7 @@ const ManagePage = () => {
           </div>
         )}
 
-        <div className="relative mb-4">
+        <form onSubmit={handleSearch} className="relative mb-4">
           <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
           <input 
             type="text" 
@@ -767,19 +843,24 @@ const ManagePage = () => {
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
           {searchQuery && (
-             <button onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
+             <button type="button" onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
                 <X size={16} />
              </button>
           )}
-          <button onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
-        </div>
+          <button type="button" onClick={() => setShowScanner(!showScanner)} className="absolute right-2 top-2 bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"><ScanLine size={24} /></button>
+        </form>
 
         {/* List Data */}
         {loading ? <p className="text-center py-10 text-gray-500 animate-pulse">Sedang memuat data...</p> : (
           <div className="space-y-3">
-            <div className="text-xs text-gray-400 mb-2 text-right">Menampilkan {filteredProducts.length} dari {products.length} data</div>
             
-            {filteredProducts.map((item) => (
+            {/* Info Mode Tampilan */}
+            <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
+                <span>{isSearching ? 'Hasil Pencarian' : 'Data Terbaru (Max 100)'}</span>
+                <span>Menampilkan {products.length} data</span>
+            </div>
+            
+            {products.map((item) => (
               <div key={item.id} className="border p-3 rounded-lg shadow-sm bg-gray-50 flex justify-between items-center hover:bg-gray-50 transition">
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{item.item_name}</div>
@@ -815,11 +896,16 @@ const ManagePage = () => {
               </div>
             ))}
             
-            {filteredProducts.length === 0 && (
+            {products.length === 0 && (
                 <div className="text-center py-10">
                     <p className="text-gray-400 mb-2">
-                        {searchQuery ? `Tidak ada Nama/SKU: "${searchQuery}"` : "Data kosong."}
+                        {isSearching ? `Tidak ada Nama/SKU: "${searchQuery}"` : "Data kosong."}
                     </p>
+                    {isSearching && (
+                        <button onClick={clearSearch} className="text-blue-600 font-bold text-sm hover:underline flex items-center justify-center gap-1 mx-auto">
+                            <RefreshCw size={14} /> Reset Pencarian
+                        </button>
+                    )}
                 </div>
             )}
           </div>
