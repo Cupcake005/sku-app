@@ -1233,7 +1233,7 @@
 
 //=================================================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useExportList } from '../ExportContext';
 import { useNavigate } from 'react-router-dom';
@@ -1259,7 +1259,7 @@ const ScanPage = () => {
   const [pendingSku, setPendingSku] = useState('');     
   const [showAddModal, setShowAddModal] = useState(false);
   const [productFormDefault, setProductFormDefault] = useState(null); 
-  const [allProducts, setAllProducts] = useState([]); // Hanya dipakai untuk edit modal
+  const [allProducts, setAllProducts] = useState([]); 
 
   // --- STATE MODAL & NOTIFIKASI ---
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -1268,13 +1268,41 @@ const ScanPage = () => {
   const [notifyModal, setNotifyModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
   // Scanner State
+  // Simpan status kamera sebelumnya untuk dipulihkan nanti
+  const previousCameraState = useRef(false);
+
   const [isCameraActive, setIsCameraActive] = useState(() => {
     return localStorage.getItem('camera_active') === 'false' ? false : true;
   });
   const [isFlashOn, setIsFlashOn] = useState(false);
 
+  // --- LOGIKA OTOMATIS MATIKAN KAMERA ---
+  const [isSearching, setIsSearching] = useState(false); // Naikkan scope isSearching ke atas
+
   useEffect(() => {
-    localStorage.setItem('camera_active', isCameraActive);
+    // Kondisi di mana kamera harus MATI SEMENTARA
+    const shouldPauseCamera = showAddModal || !!productData || isSearching || showConfirmModal;
+
+    if (shouldPauseCamera) {
+        if (isCameraActive) {
+            previousCameraState.current = true; // Ingat bahwa tadi kamera nyala
+            setIsCameraActive(false);           // Matikan sekarang
+            setIsFlashOn(false);                // Matikan flash juga
+        }
+    } else {
+        // Jika semua modal tutup, pulihkan status kamera
+        if (previousCameraState.current) {
+            setIsCameraActive(true);
+            previousCameraState.current = false; // Reset memori
+        }
+    }
+  }, [showAddModal, productData, isSearching, showConfirmModal]); // Dependensi pemicu
+
+  // Simpan preferensi User ke localStorage (Hanya jika bukan karena pause otomatis)
+  useEffect(() => {
+    if (!showAddModal && !productData && !isSearching && !showConfirmModal) {
+        localStorage.setItem('camera_active', isCameraActive);
+    }
   }, [isCameraActive]);
 
   // --- AUDIO BEEP RINGAN (WEB AUDIO API) ---
@@ -1317,11 +1345,9 @@ const ScanPage = () => {
 
   const closeNotify = () => setNotifyModal({ ...notifyModal, isOpen: false });
 
-  // --- FETCH DATA SEKALI SAJA (OPTIMAL) ---
+  // --- FETCH DATA SEKALI SAJA ---
   useEffect(() => {
     const fetchAllProducts = async () => {
-      // Kita fetch semua produk HANYA untuk kebutuhan autocomplete/edit modal,
-      // tapi tidak merender semuanya di halaman utama (search result kosong di awal).
       try {
         const { data, error } = await supabase.from('products').select('*');
         if (error) throw error;
@@ -1333,29 +1359,31 @@ const ScanPage = () => {
 
     if (user) {
         fetchAllProducts();
-        // setInterval DIHAPUS agar tidak memberatkan
     }
   }, [user]);
 
-  // --- SEARCH (OPTIMAL: Server Side Search) ---
+  // --- SEARCH ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [copiedSku, setCopiedSku] = useState(null);
+
   const executeSearch = useCallback(async (queryText) => {
       const query = queryText.trim();
       if (!query) {
-          setSearchResults([]); // Kosongkan jika query kosong
+          setSearchResults([]); 
           setIsSearching(false);
           return;
       }
 
       setLoading(true);
-      setIsSearching(true);
+      setIsSearching(true); // Ini akan memicu useEffect kamera mati
 
       try {
-        // Cari di Supabase (Server-side filtering lebih cepat daripada filter di client untuk data ribuan)
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .or(`item_name.ilike.%${query}%,sku.ilike.%${query}%`) 
-          .limit(20); // Batasi 20 hasil saja agar ringan
+          .limit(20);
 
         if (error) throw error;
         
@@ -1373,13 +1401,7 @@ const ScanPage = () => {
       } finally {
         setLoading(false);
       }
-  }, []); // Dependensi kosong karena fungsi ini stabil
-
-  // Search State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [copiedSku, setCopiedSku] = useState(null);
+  }, []);
 
   const handleCopySku = async (sku) => {
     if (!sku || sku === '-') return;
@@ -1410,7 +1432,7 @@ const ScanPage = () => {
     
     addToExportList(product);
     setProductData(null); 
-    clearSearch();
+    clearSearch(); // Ini akan memicu kamera hidup lagi
   };
 
   const executeUpdate = () => {
@@ -1439,7 +1461,7 @@ const ScanPage = () => {
   const clearSearch = () => { 
       setSearchQuery(''); 
       setSearchResults([]); 
-      setIsSearching(false); 
+      setIsSearching(false); // Kamera akan hidup lagi di sini
   };
   
   const handleItemClick = (item) => { setProductData(item); };
@@ -1479,12 +1501,10 @@ const ScanPage = () => {
         setProductFormDefault(null); 
 
         if (data) {
-            // Update lokal state saja, tidak perlu fetch ulang seluruh database
             setAllProducts(prev => {
                 if (isUpdate) return prev.map(p => p.id === data.id ? data : p);
                 return [data, ...prev];
             });
-            // Update hasil pencarian juga
             setSearchResults(prev => {
                 if (isUpdate) return prev.map(p => p.id === data.id ? data : p);
                 return [data, ...prev];
@@ -1613,7 +1633,7 @@ const ScanPage = () => {
                 <button 
                     onClick={() => {
                         setIsCameraActive(!isCameraActive);
-                        if(!isCameraActive) unlockAudioContext(); 
+                        if(!isCameraActive) unlockAudioContext(); // PANCING AUDIO SAAT KAMERA HIDUP
                     }}
                     className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${
                         isCameraActive ? 'bg-gray-800' : 'bg-green-600'

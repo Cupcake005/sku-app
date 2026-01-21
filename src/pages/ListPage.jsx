@@ -526,6 +526,7 @@ const ListPage = () => {
 
     const rows = filteredList.map(item => { 
       const category = `"${item.category || ''}"`;
+      
       const sku = `"${item.sku || ''}"`; 
       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
       const brand = `"${item.brand_name || ''}"`; 

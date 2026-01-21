@@ -188,8 +188,8 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
   // Kita HAPUS 'allProducts' dari dependency array di sini agar input tidak reset saat auto-refresh background jalan.
   useEffect(() => {
     if (product && isOpen) {
-      setPriceNormal(product.price || 0);
-      setPriceWholesale(product.wholesale_price || 0);
+      setPriceNormal(product.price);
+      setPriceWholesale(product.wholesale_price);
     }
   }, [isOpen, product?.id]); // Gunakan optional chaining product?.id agar lebih aman
 
