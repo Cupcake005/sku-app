@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthProvider';
+import { useAuth } from '../AuthProvider'; // Pastikan path benar
 import { useNavigate } from 'react-router-dom';
 import { User, Phone, Lock, Save, LogOut, ArrowLeft, Camera, Loader } from 'lucide-react';
 import NotificationModal from '../components/NotificationModal';
 
 const AccountPage = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth(); // Kita tidak perlu destructure signOut dari sini untuk menghindari error jika tidak ada
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false); // State khusus upload foto
+  const [uploading, setUploading] = useState(false); 
 
   // State Form Profil
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(null); // State link foto
+  const [avatarUrl, setAvatarUrl] = useState(null); 
 
   // State Form Password
   const [password, setPassword] = useState('');
@@ -31,6 +31,30 @@ const AccountPage = () => {
     }
   }, [user]);
 
+  // --- FUNGSI LOGOUT YANG DIPERBAIKI ---
+  const handleLogout = async () => {
+      const confirmLogout = window.confirm("Apakah Anda yakin ingin keluar?");
+      if (!confirmLogout) return;
+
+      try {
+          // 1. Logout dari Supabase
+          await supabase.auth.signOut();
+          
+          // 2. Bersihkan Local Storage (Opsional tapi bagus agar bersih)
+          localStorage.clear();
+          
+          // 3. Paksa pindah ke halaman Login
+          navigate('/login', { replace: true });
+          
+          // 4. Reload halaman agar state AuthProvider bersih total
+          window.location.reload(); 
+
+      } catch (error) {
+          console.error("Logout Error:", error);
+          setNotify({ isOpen: true, type: 'error', title: 'Gagal', message: 'Gagal logout. Coba lagi.' });
+      }
+  };
+
   // --- FUNGSI UPLOAD FOTO ---
   const handleUploadAvatar = async (event) => {
     try {
@@ -42,32 +66,28 @@ const AccountPage = () => {
 
       const file = event.target.files[0];
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Math.random()}.${fileExt}`; // Nama file unik per user
+      const fileName = `${user.id}/${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // 1. Upload ke Supabase Storage (Bucket 'avatars')
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // 2. Ambil Link Public-nya
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
-      // 3. Update User Metadata dengan Link Foto baru
       const { error: updateUserError } = await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       });
 
       if (updateUserError) throw updateUserError;
 
-      // 4. Update Tampilan
       setAvatarUrl(publicUrl);
       setNotify({ isOpen: true, type: 'success', title: 'Berhasil', message: 'Foto profil diperbarui!' });
       
-      // Refresh halaman sebentar biar Header di atas ikut berubah (Opsional)
+      // Refresh halaman sebentar
       setTimeout(() => window.location.reload(), 1000);
 
     } catch (error) {
@@ -113,11 +133,6 @@ const AccountPage = () => {
     }
   };
 
-  const handleLogout = async () => {
-      const { error } = await signOut();
-      if (!error) navigate('/login');
-  };
-
   return (
     <div className="pb-24">
       {/* Header Back */}
@@ -130,7 +145,7 @@ const AccountPage = () => {
 
       <div className="p-4 space-y-6 max-w-md mx-auto">
         
-        {/* --- AREA FOTO PROFIL (BARU) --- */}
+        {/* --- AREA FOTO PROFIL --- */}
         <div className="flex flex-col items-center justify-center -mt-2">
             <div className="relative group">
                 <div className="w-28 h-28 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100">
@@ -147,7 +162,6 @@ const AccountPage = () => {
                     )}
                 </div>
                 
-                {/* Tombol Kamera Overlay */}
                 <label 
                     htmlFor="avatar-upload" 
                     className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-md cursor-pointer hover:bg-blue-700 transition transform hover:scale-110"
@@ -230,6 +244,7 @@ const AccountPage = () => {
             </form>
         </div>
 
+        {/* --- TOMBOL LOGOUT --- */}
         <button 
             onClick={handleLogout}
             className="w-full bg-red-50 text-red-600 font-bold py-3 rounded-xl border border-red-100 hover:bg-red-100 transition flex items-center justify-center gap-2"
