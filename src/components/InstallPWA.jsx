@@ -46,7 +46,7 @@ const InstallPWA = () => {
             </div>
             <div>
                 <p className="font-bold text-sm">Install Aplikasi Toko</p>
-                <p className="text-xs text-blue-100">Akses lebih cepat & offline</p>
+                <p className="text-xs text-blue-100">Akses lebih cepat</p>
             </div>
         </div>
         
