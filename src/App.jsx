@@ -102,6 +102,7 @@ import InstallPWA from './components/InstallPWA';
 import LoginPage from './pages/LoginPage';
 import TopHeader from './components/TopHeader'; 
 import UpdatePassword from './pages/UpdatePassword'; 
+import AccountPage from './pages/AccountPage';
 
 // Import Offline Status
 import OfflineStatus from './components/OfflineStatus';
@@ -167,7 +168,11 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
 
             {/* Halaman Update Password */}
-            <Route path="/update-password" element={<UpdatePassword />} /> 
+            <Route path="/update-password" element={<UpdatePassword />} />
+            
+            <Route path="/acount" element={<AccountPage />} /> 
+
+            
 
             {/* Halaman Aplikasi (Protected) */}
             {/* Tanda '*' artinya semua urusan routing di dalamnya diserahkan ke AppLayout */}
