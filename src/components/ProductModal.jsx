@@ -335,7 +335,7 @@ const ProductModal = ({ isOpen, onClose, product, onSave, onScanClick, setIsScan
             />
             {/* Indikator Karakter */}
             <div className={`text-[10px] flex justify-end mt-1 ${isNameTooLong ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                {isNameTooLong && <span className="flex items-center gap-1 mr-auto"><AlertCircle size={10}/> Nama terlalu panjang (Max 30)</span>}
+                {isNameTooLong && <span className="flex items-center gap-1 mr-auto"><AlertCircle size={10}/> Nama terlalu panjang</span>}
                 <span>{nameLength} / 30 Karakter</span>
             </div>
           </div>
