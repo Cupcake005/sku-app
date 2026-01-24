@@ -45,8 +45,8 @@ const InstallPWA = () => {
                 <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
             </div>
             <div>
-                <p className="font-bold text-sm">Install Aplikasi Toko</p>
-                <p className="text-xs text-blue-100">Akses lebih cepat</p>
+                <p className="font-bold text-sm">Install SKU Master V2 by Vikt</p>
+                <p className="text-xs text-blue-100">Ndak pengen instal jak kah?</p>
             </div>
         </div>
         
