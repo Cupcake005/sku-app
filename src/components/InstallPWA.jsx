@@ -66,3 +66,4 @@ const InstallPWA = () => {
 };
 
 export default InstallPWA;
+
