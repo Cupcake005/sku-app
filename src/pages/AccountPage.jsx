@@ -537,7 +537,7 @@ const AccountPage = () => {
         {/* --- FORM PILIH TOKO --- */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-gray-700 flex items-center gap-2"><Store size={20} className="text-purple-600"/> Toko Aktif</h3>
+                <h3 className="font-bold text-gray-700 flex items-center gap-2"><Store size={20} className="text-purple-600"/> Toko Aktif *on progres</h3>
                 <button onClick={() => setShowCreateStore(!showCreateStore)} className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-lg font-bold border border-purple-100 hover:bg-purple-100">
                     {showCreateStore ? 'Batal' : '+ Toko Baru'}
                 </button>
