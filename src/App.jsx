@@ -170,7 +170,7 @@ function App() {
             {/* Halaman Update Password */}
             <Route path="/update-password" element={<UpdatePassword />} />
             
-            <Route path="/acount" element={<AccountPage />} /> 
+            <Route path="/account" element={<AccountPage />} /> 
 
             
 
