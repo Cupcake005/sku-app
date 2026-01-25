@@ -597,8 +597,8 @@ const ListPage = () => {
       const brand = `"${item.brand_name || ''}"`; 
       const variant = `"${item.variant_name || ''}"`;
       
-      const price = item.price || 0;
-      const wholesale = item.wholesale_price || 0;
+      const price = item.price || '';
+      const wholesale = item.wholesale_price || '';
 
       // Logika Isi Basic Price
       // Kalau ada mode grosir, Basic Price dikosongkan. Kalau tidak ada, diisi harga normal.
