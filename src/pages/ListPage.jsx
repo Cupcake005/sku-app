@@ -610,7 +610,7 @@ const ListPage = () => {
         category,       
         sku,            
         name,           
-        '""', '""', '""', '""', '""', '""', '""', '""', // E-commerce fields kosong
+        '"No"', '"No"', '"0"', '""', '""', '""', '""', '""', // E-commerce fields kosong
         brand,          
         variant,        
         basicPriceVal,  // Basic - Price (Isi atau Kosong tergantung kondisi)
@@ -626,7 +626,7 @@ const ListPage = () => {
       }
 
       // Array Akhir (Stock dll)
-      rowArray.push('""', '""', '""', '""', '""', '""');
+      rowArray.push('"0"', '"No"', '"No"', '"0"', '"No"', '""');
 
       return rowArray.join(",");
     });
