@@ -641,7 +641,7 @@ const ListPage = () => {
     // Nama File: Tambahkan penanda jika ada grosir
     const typeLabel = hasWholesale ? '_MultiHarga' : '_SingleHarga';
     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
-    link.setAttribute("download", `Export_Moka${typeLabel}${dateLabel}.csv`);
+    link.setAttribute("download", `Data_produk${typeLabel}${dateLabel}.csv`);
     
     document.body.appendChild(link);
     link.click();
