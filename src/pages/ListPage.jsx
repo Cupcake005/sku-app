@@ -516,37 +516,132 @@ const ListPage = () => {
   };
 
   // --- LOGIKA DOWNLOAD ---
+//   const handleDownload = () => {
+//     if (filteredList.length === 0) {
+//         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
+//         return;
+//     }
+
+//     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Harga Grosir";
+    
+
+//     const rows = filteredList.map(item => { 
+//       const category = `"${item.category || ''}"`;
+      
+//       const sku = `"${item.sku || ''}"`; 
+//       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
+//       const brand = `"${item.brand_name || ''}"`; 
+//       const variant = `"${item.variant_name || ''}"`;
+//       const price = item.price || '';
+//       const wholesale = item.wholesale_price || ''; 
+//     //   const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
+
+//     //   return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
+//     return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+//     });
+
+//     const csvContent = [header, ...rows].join("\n");
+//     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+//     const link = document.createElement("a");
+//     const url = URL.createObjectURL(blob);
+//     link.setAttribute("href", url);
+    
+//     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
+//     link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
+    
+//     document.body.appendChild(link);
+//     link.click();
+//     document.body.removeChild(link);
+//   };
+
+// --- LOGIKA DOWNLOAD (UPDATED V3) ---
   const handleDownload = () => {
     if (filteredList.length === 0) {
         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
         return;
     }
 
-    const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Harga Grosir";
+    // 1. CEK APAKAH ADA BARANG YANG PUNYA HARGA GROSIR?
+    const hasWholesale = filteredList.some(item => item.wholesale_price && item.wholesale_price > 0);
 
+    // 2. SUSUN HEADER DINAMIS
+    // Bagian 1: Header Awal sampai Image 12
+    let headerParts = [
+        "Internal ID Variant (Do Not Edit)", "Category", "SKU", "Items Name (Do Not Edit)", 
+        "ecommerce item? (Yes/No)", "Pre-order ? (Yes/No)", "Processing days", 
+        "Weight (gm)", "Length (cm)", "Width (cm)", "Height (cm)", "Condition", 
+        "Brand Name", "Variant name", "Basic - Price", // <--- Basic Price Tetap Ada
+        "Image 1 (for Online Store)", "Image 2 (for Online Store)", "Image 3 (for Online Store)", 
+        "Image 4 (for Online Store)", "Image 5 (for Online Store)", "Image 6 (for Online Store)", 
+        "Image 7 (for Online Store)", "Image 8 (for Online Store)", "Image 9 (for Online Store)", 
+        "Image 10 (for Online Store)", "Image 11 (for Online Store)", "Image 12 (for Online Store)"
+    ];
+
+    // Bagian 2: Kondisional Header (Normal & Grosir)
+    if (hasWholesale) {
+        headerParts.push("1. HARGA NORMAL - Price");
+        headerParts.push("2. HARGA GROSIR - Price");
+    }
+
+    // Bagian 3: Header Akhir
+    headerParts.push("In Stock", "Track Stock", "Track Alert", "Stock Alert", "Track Cost", "Cost Amount");
+
+    // Gabungkan Header jadi string
+    const header = headerParts.join(",");
+
+    // 3. SUSUN BARIS DATA
     const rows = filteredList.map(item => { 
       const category = `"${item.category || ''}"`;
-      
       const sku = `"${item.sku || ''}"`; 
       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
       const brand = `"${item.brand_name || ''}"`; 
       const variant = `"${item.variant_name || ''}"`;
-      const price = item.price || '';
-      const wholesale = item.wholesale_price || ''; 
-    //   const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
+      
+      const price = item.price || 0;
+      const wholesale = item.wholesale_price || 0;
 
-    //   return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
-    return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+      // Logika Isi Basic Price
+      // Kalau ada mode grosir, Basic Price dikosongkan. Kalau tidak ada, diisi harga normal.
+      const basicPriceVal = hasWholesale ? '' : price;
+
+      // Array Baris Dasar
+      let rowArray = [
+        '""',           // Internal ID
+        category,       
+        sku,            
+        name,           
+        '""', '""', '""', '""', '""', '""', '""', '""', // E-commerce fields kosong
+        brand,          
+        variant,        
+        basicPriceVal,  // Basic - Price (Isi atau Kosong tergantung kondisi)
+        
+        // --- 12 IMAGE KOSONG ---
+        '""','""','""','""','""','""','""','""','""','""','""','""'
+      ];
+
+      // Kondisional Isi (Normal & Grosir)
+      if (hasWholesale) {
+          rowArray.push(price);     // 1. HARGA NORMAL
+          rowArray.push(wholesale); // 2. HARGA GROSIR
+      }
+
+      // Array Akhir (Stock dll)
+      rowArray.push('""', '""', '""', '""', '""', '""');
+
+      return rowArray.join(",");
     });
 
+    // 4. BIKIN FILE CSV
     const csvContent = [header, ...rows].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
     
+    // Nama File: Tambahkan penanda jika ada grosir
+    const typeLabel = hasWholesale ? '_MultiHarga' : '_SingleHarga';
     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
-    link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
+    link.setAttribute("download", `Export_Moka${typeLabel}${dateLabel}.csv`);
     
     document.body.appendChild(link);
     link.click();
