@@ -1,7 +1,3 @@
-
-
-// //=============================================
-
 // import React, { useState, useEffect } from 'react';
 // import { useExportList } from '../ExportContext';
 // import { useNavigate } from 'react-router-dom';
@@ -15,9 +11,11 @@
 //   const { exportList, clearExportList, removeFromExportList } = useExportList();
 //   const navigate = useNavigate();
 
-//   // --- 1. STATE UNTUK FILTER ---
-//   const [startDate, setStartDate] = useState('');
-//   const [endDate, setEndDate] = useState('');
+//   // --- 1. STATE DENGAN LOCAL STORAGE ---
+//   // Kita cek dulu di Local Storage, kalau ada pakai itu, kalau tidak kosongkan ('')
+//   const [startDate, setStartDate] = useState(() => localStorage.getItem('filter_startDate') || '');
+//   const [endDate, setEndDate] = useState(() => localStorage.getItem('filter_endDate') || '');
+  
 //   const [filteredList, setFilteredList] = useState([]);
 //   const [isFilterActive, setIsFilterActive] = useState(false);
 
@@ -32,33 +30,38 @@
 //     setNotifyModal({ isOpen: true, type, title, message });
 //   };
 
-//   // --- 2. HANDLER VALIDASI TANGGAL (BARU) ---
+//   // --- 2. EFFECT UNTUK MENYIMPAN KE LOCAL STORAGE ---
+//   useEffect(() => {
+//       // Setiap kali startDate atau endDate berubah, simpan ke memori HP/Browser
+//       if (startDate) localStorage.setItem('filter_startDate', startDate);
+//       else localStorage.removeItem('filter_startDate');
+
+//       if (endDate) localStorage.setItem('filter_endDate', endDate);
+//       else localStorage.removeItem('filter_endDate');
+//   }, [startDate, endDate]);
+
+//   // --- HANDLER VALIDASI TANGGAL ---
 //   const handleStartDateChange = (e) => {
 //       const newStart = e.target.value;
-      
-//       // Jika user memajukan tanggal mulai melebihi tanggal akhir yg sudah dipilih
 //       if (endDate && newStart > endDate) {
-//           showNotify('error', 'Tanggal Tidak Valid', 'Tanggal Mulai tidak boleh melebihi Tanggal Akhir. Tanggal Akhir akan direset.');
-//           setEndDate(''); // Reset tanggal akhir biar user pilih ulang
+//           showNotify('error', 'Tanggal Tidak Valid', 'Tanggal Mulai tidak boleh melebihi Tanggal Akhir. Tanggal Akhir direset.');
+//           setEndDate(''); 
 //       }
 //       setStartDate(newStart);
 //   };
 
 //   const handleEndDateChange = (e) => {
 //       const newEnd = e.target.value;
-
-//       // Validasi: Akhir tidak boleh kurang dari Mulai
 //       if (startDate && newEnd < startDate) {
 //           showNotify('error', 'Tanggal Tidak Valid', 'Tanggal Akhir tidak boleh lebih kecil dari Tanggal Mulai!');
-//           return; // Jangan update state, biarkan tetap kosong/lama
+//           return; 
 //       }
 //       setEndDate(newEnd);
 //   };
 
-//   // --- 3. SINKRONISASI DATA & LOGIKA FILTER ---
+//   // --- 3. LOGIKA FILTER (SINKRONISASI DATA) ---
 //   useEffect(() => {
 //     const applyFilter = () => {
-//         // Hanya filter jika KEDUA tanggal terisi
 //         if (!startDate || !endDate) {
 //             setFilteredList(exportList);
 //             setIsFilterActive(false);
@@ -87,6 +90,7 @@
 //   const handleResetFilter = () => {
 //       setStartDate('');
 //       setEndDate('');
+//       // LocalStorage akan otomatis terhapus karena useEffect di poin nomor 2 mendeteksi perubahan state jadi kosong
 //       setFilteredList(exportList);
 //       setIsFilterActive(false);
 //   };
@@ -135,35 +139,132 @@
 //   };
 
 //   // --- LOGIKA DOWNLOAD ---
+// //   const handleDownload = () => {
+// //     if (filteredList.length === 0) {
+// //         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
+// //         return;
+// //     }
+
+// //     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Harga Grosir";
+    
+
+// //     const rows = filteredList.map(item => { 
+// //       const category = `"${item.category || ''}"`;
+      
+// //       const sku = `"${item.sku || ''}"`; 
+// //       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
+// //       const brand = `"${item.brand_name || ''}"`; 
+// //       const variant = `"${item.variant_name || ''}"`;
+// //       const price = item.price || '';
+// //       const wholesale = item.wholesale_price || ''; 
+// //     //   const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
+
+// //     //   return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
+// //     return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
+// //     });
+
+// //     const csvContent = [header, ...rows].join("\n");
+// //     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+// //     const link = document.createElement("a");
+// //     const url = URL.createObjectURL(blob);
+// //     link.setAttribute("href", url);
+    
+// //     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
+// //     link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
+    
+// //     document.body.appendChild(link);
+// //     link.click();
+// //     document.body.removeChild(link);
+// //   };
+
+// // --- LOGIKA DOWNLOAD (UPDATED V3) ---
 //   const handleDownload = () => {
 //     if (filteredList.length === 0) {
 //         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
 //         return;
 //     }
 
-//     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Wholesale Price,Date Scanned";
+//     // 1. CEK APAKAH ADA BARANG YANG PUNYA HARGA GROSIR?
+//     const hasWholesale = filteredList.some(item => item.wholesale_price && item.wholesale_price > 0);
 
+//     // 2. SUSUN HEADER DINAMIS
+//     // Bagian 1: Header Awal sampai Image 12
+//     let headerParts = [
+//         "Internal ID Variant (Do Not Edit)", "Category", "SKU", "Items Name (Do Not Edit)", 
+//         "ecommerce item? (Yes/No)", "Pre-order ? (Yes/No)", "Processing days", 
+//         "Weight (gm)", "Length (cm)", "Width (cm)", "Height (cm)", "Condition", 
+//         "Brand Name", "Variant name", "Basic - Price", // <--- Basic Price Tetap Ada
+//         "Image 1 (for Online Store)", "Image 2 (for Online Store)", "Image 3 (for Online Store)", 
+//         "Image 4 (for Online Store)", "Image 5 (for Online Store)", "Image 6 (for Online Store)", 
+//         "Image 7 (for Online Store)", "Image 8 (for Online Store)", "Image 9 (for Online Store)", 
+//         "Image 10 (for Online Store)", "Image 11 (for Online Store)", "Image 12 (for Online Store)"
+//     ];
+
+//     // Bagian 2: Kondisional Header (Normal & Grosir)
+//     if (hasWholesale) {
+//         headerParts.push("1. HARGA NORMAL - Price");
+//         headerParts.push("2. HARGA GROSIR - Price");
+//     }
+
+//     // Bagian 3: Header Akhir
+//     headerParts.push("In Stock", "Track Stock", "Track Alert", "Stock Alert", "Track Cost", "Cost Amount");
+
+//     // Gabungkan Header jadi string
+//     const header = headerParts.join(",");
+
+//     // 3. SUSUN BARIS DATA
 //     const rows = filteredList.map(item => { 
 //       const category = `"${item.category || ''}"`;
-//       const sku = `"${item.sku || '-'}"`; 
+//       const sku = `"${item.sku || ''}"`; 
 //       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
-//       const brand = `"${item.brand_name || '-'}"`; 
+//       const brand = `"${item.brand_name || ''}"`; 
 //       const variant = `"${item.variant_name || ''}"`;
-//       const price = item.price || 0;
-//       const wholesale = item.wholesale_price || 0; 
-//       const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
+      
+//       const price = item.price || '';
+//       const wholesale = item.wholesale_price || '';
 
-//       return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
+//       // Logika Isi Basic Price
+//       // Kalau ada mode grosir, Basic Price dikosongkan. Kalau tidak ada, diisi harga normal.
+//       const basicPriceVal = hasWholesale ? '' : price;
+
+//       // Array Baris Dasar
+//       let rowArray = [
+//         '""',           // Internal ID
+//         category,       
+//         sku,            
+//         name,           
+//         '"No"', '"No"', '"0"', '""', '""', '""', '""', '""', // E-commerce fields kosong
+//         brand,          
+//         variant,        
+//         basicPriceVal,  // Basic - Price (Isi atau Kosong tergantung kondisi)
+        
+//         // --- 12 IMAGE KOSONG ---
+//         '""','""','""','""','""','""','""','""','""','""','""','""'
+//       ];
+
+//       // Kondisional Isi (Normal & Grosir)
+//       if (hasWholesale) {
+//           rowArray.push(price);     // 1. HARGA NORMAL
+//           rowArray.push(wholesale); // 2. HARGA GROSIR
+//       }
+
+//       // Array Akhir (Stock dll)
+//       rowArray.push('"0"', '"No"', '"No"', '"0"', '"No"', '""');
+
+//       return rowArray.join(",");
 //     });
 
+//     // 4. BIKIN FILE CSV
 //     const csvContent = [header, ...rows].join("\n");
 //     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 //     const link = document.createElement("a");
 //     const url = URL.createObjectURL(blob);
 //     link.setAttribute("href", url);
     
+//     // Nama File: Tambahkan penanda jika ada grosir
+//     const typeLabel = hasWholesale ? '_MultiHarga' : '_SingleHarga';
 //     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
-//     link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
+//     link.setAttribute("download", `Data_produk${typeLabel}${dateLabel}.csv`);
     
 //     document.body.appendChild(link);
 //     link.click();
@@ -199,8 +300,8 @@
 //                     <input 
 //                         type="date" 
 //                         value={startDate}
-//                         onChange={handleStartDateChange} // Pakai handler baru
-//                         max={endDate} // UI UX: Gak bisa pilih tanggal setelah End Date
+//                         onChange={handleStartDateChange} 
+//                         max={endDate} 
 //                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
 //                     />
 //                 </div>
@@ -212,8 +313,8 @@
 //                     <input 
 //                         type="date" 
 //                         value={endDate}
-//                         onChange={handleEndDateChange} // Pakai handler baru
-//                         min={startDate} // UI UX: Gak bisa pilih tanggal sebelum Start Date
+//                         onChange={handleEndDateChange} 
+//                         min={startDate} 
 //                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
 //                     />
 //                 </div>
@@ -378,7 +479,7 @@
 import React, { useState, useEffect } from 'react';
 import { useExportList } from '../ExportContext';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, FileDown, ArrowLeft, AlertCircle, XCircle, Tag, Clock, Calendar, Filter, RotateCcw } from 'lucide-react';
+import { Trash2, FileDown, ArrowLeft, AlertCircle, XCircle, Tag, Clock, Calendar, Filter, RotateCcw, Package } from 'lucide-react';
 
 // Import komponen Modal
 import ConfirmationModal from '../components/ConfirmationModal'; 
@@ -389,7 +490,6 @@ const ListPage = () => {
   const navigate = useNavigate();
 
   // --- 1. STATE DENGAN LOCAL STORAGE ---
-  // Kita cek dulu di Local Storage, kalau ada pakai itu, kalau tidak kosongkan ('')
   const [startDate, setStartDate] = useState(() => localStorage.getItem('filter_startDate') || '');
   const [endDate, setEndDate] = useState(() => localStorage.getItem('filter_endDate') || '');
   
@@ -409,7 +509,6 @@ const ListPage = () => {
 
   // --- 2. EFFECT UNTUK MENYIMPAN KE LOCAL STORAGE ---
   useEffect(() => {
-      // Setiap kali startDate atau endDate berubah, simpan ke memori HP/Browser
       if (startDate) localStorage.setItem('filter_startDate', startDate);
       else localStorage.removeItem('filter_startDate');
 
@@ -467,7 +566,6 @@ const ListPage = () => {
   const handleResetFilter = () => {
       setStartDate('');
       setEndDate('');
-      // LocalStorage akan otomatis terhapus karena useEffect di poin nomor 2 mendeteksi perubahan state jadi kosong
       setFilteredList(exportList);
       setIsFilterActive(false);
   };
@@ -515,81 +613,37 @@ const ListPage = () => {
     setModalConfig({ ...modalConfig, isOpen: false });
   };
 
-  // --- LOGIKA DOWNLOAD ---
-//   const handleDownload = () => {
-//     if (filteredList.length === 0) {
-//         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
-//         return;
-//     }
-
-//     const header = "Category,SKU,Items Name (Do Not Edit),Brand Name,Variant name,Price,Harga Grosir";
-    
-
-//     const rows = filteredList.map(item => { 
-//       const category = `"${item.category || ''}"`;
-      
-//       const sku = `"${item.sku || ''}"`; 
-//       const name = `"${(item.item_name || '').replace(/"/g, '""')}"`; 
-//       const brand = `"${item.brand_name || ''}"`; 
-//       const variant = `"${item.variant_name || ''}"`;
-//       const price = item.price || '';
-//       const wholesale = item.wholesale_price || ''; 
-//     //   const date = `"${new Date(item.created_at).toLocaleString('id-ID')}"`;
-
-//     //   return `${category},${sku},${name},${brand},${variant},${price},${wholesale},${date}`;
-//     return `${category},${sku},${name},${brand},${variant},${price},${wholesale}`;
-//     });
-
-//     const csvContent = [header, ...rows].join("\n");
-//     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-//     const link = document.createElement("a");
-//     const url = URL.createObjectURL(blob);
-//     link.setAttribute("href", url);
-    
-//     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
-//     link.setAttribute("download", `Export_Stok${dateLabel}.csv`);
-    
-//     document.body.appendChild(link);
-//     link.click();
-//     document.body.removeChild(link);
-//   };
-
-// --- LOGIKA DOWNLOAD (UPDATED V3) ---
+  // --- LOGIKA DOWNLOAD (CANGGIH: MULTI HARGA OTOMATIS) ---
   const handleDownload = () => {
     if (filteredList.length === 0) {
         showNotify('info', 'Data Kosong', 'Tidak ada data untuk diexport.');
         return;
     }
 
-    // 1. CEK APAKAH ADA BARANG YANG PUNYA HARGA GROSIR?
+    // Cek apakah ada barang yang punya harga grosir?
     const hasWholesale = filteredList.some(item => item.wholesale_price && item.wholesale_price > 0);
 
-    // 2. SUSUN HEADER DINAMIS
-    // Bagian 1: Header Awal sampai Image 12
+    // Header Dinamis
     let headerParts = [
         "Internal ID Variant (Do Not Edit)", "Category", "SKU", "Items Name (Do Not Edit)", 
         "ecommerce item? (Yes/No)", "Pre-order ? (Yes/No)", "Processing days", 
         "Weight (gm)", "Length (cm)", "Width (cm)", "Height (cm)", "Condition", 
-        "Brand Name", "Variant name", "Basic - Price", // <--- Basic Price Tetap Ada
+        "Brand Name", "Variant name", "Basic - Price", 
         "Image 1 (for Online Store)", "Image 2 (for Online Store)", "Image 3 (for Online Store)", 
         "Image 4 (for Online Store)", "Image 5 (for Online Store)", "Image 6 (for Online Store)", 
         "Image 7 (for Online Store)", "Image 8 (for Online Store)", "Image 9 (for Online Store)", 
         "Image 10 (for Online Store)", "Image 11 (for Online Store)", "Image 12 (for Online Store)"
     ];
 
-    // Bagian 2: Kondisional Header (Normal & Grosir)
     if (hasWholesale) {
         headerParts.push("1. HARGA NORMAL - Price");
         headerParts.push("2. HARGA GROSIR - Price");
     }
 
-    // Bagian 3: Header Akhir
     headerParts.push("In Stock", "Track Stock", "Track Alert", "Stock Alert", "Track Cost", "Cost Amount");
 
-    // Gabungkan Header jadi string
     const header = headerParts.join(",");
 
-    // 3. SUSUN BARIS DATA
     const rows = filteredList.map(item => { 
       const category = `"${item.category || ''}"`;
       const sku = `"${item.sku || ''}"`; 
@@ -597,56 +651,52 @@ const ListPage = () => {
       const brand = `"${item.brand_name || ''}"`; 
       const variant = `"${item.variant_name || ''}"`;
       
-      const price = item.price || '';
-      const wholesale = item.wholesale_price || '';
+      const price = item.price || 0;
+      const wholesale = item.wholesale_price || 0;
 
-      // Logika Isi Basic Price
-      // Kalau ada mode grosir, Basic Price dikosongkan. Kalau tidak ada, diisi harga normal.
+      // Jika ada grosir, Basic Price kosong. Jika tidak, Basic Price isi harga.
       const basicPriceVal = hasWholesale ? '' : price;
 
-      // Array Baris Dasar
       let rowArray = [
-        '""',           // Internal ID
-        category,       
-        sku,            
-        name,           
-        '"No"', '"No"', '"0"', '""', '""', '""', '""', '""', // E-commerce fields kosong
-        brand,          
-        variant,        
-        basicPriceVal,  // Basic - Price (Isi atau Kosong tergantung kondisi)
-        
-        // --- 12 IMAGE KOSONG ---
+        '""', category, sku, name, '""', '""', '""', '""', '""', '""', '""', '""',
+        brand, variant, basicPriceVal,
         '""','""','""','""','""','""','""','""','""','""','""','""'
       ];
 
-      // Kondisional Isi (Normal & Grosir)
       if (hasWholesale) {
-          rowArray.push(price);     // 1. HARGA NORMAL
-          rowArray.push(wholesale); // 2. HARGA GROSIR
+          rowArray.push(price);
+          rowArray.push(wholesale);
       }
 
-      // Array Akhir (Stock dll)
-      rowArray.push('"0"', '"No"', '"No"', '"0"', '"No"', '""');
+      rowArray.push('""', '""', '""', '""', '""', '""');
 
       return rowArray.join(",");
     });
 
-    // 4. BIKIN FILE CSV
     const csvContent = [header, ...rows].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
     
-    // Nama File: Tambahkan penanda jika ada grosir
     const typeLabel = hasWholesale ? '_MultiHarga' : '_SingleHarga';
     const dateLabel = isFilterActive ? `_${startDate}_sd_${endDate}` : '_All';
-    link.setAttribute("download", `Data_produk${typeLabel}${dateLabel}.csv`);
+    link.setAttribute("download", `Export_Moka${typeLabel}${dateLabel}.csv`);
     
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+
+  // --- 4. HITUNG JUMLAH PRODUK UNIK (BARU) ---
+  // Logika: Gabungkan "Nama|Kategori" lalu masukkan ke Set agar unik
+  const uniqueProductCount = new Set(
+    filteredList.map(item => {
+        const name = (item.item_name || '').trim().toLowerCase();
+        const cat = (item.category || '').trim().toLowerCase();
+        return `${name}|${cat}`;
+    })
+  ).size;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-44">
@@ -660,8 +710,17 @@ const ListPage = () => {
             </button>
             <h1 className="text-xl font-bold text-gray-800">List Export</h1>
             </div>
-            <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">
-            {filteredList.length} / {exportList.length} Item
+
+            {/* --- INFO JUMLAH (ITEM & PRODUK) --- */}
+            <div className="flex flex-col items-end">
+                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                    {filteredList.length} / {exportList.length} Item
+                </div>
+                {/* Tampilan Jumlah Produk */}
+                <div className="text-[10px] text-gray-500 font-bold mt-1 mr-1 flex items-center gap-1">
+                    <Package size={12} className="text-gray-400"/> 
+                    {uniqueProductCount} Produk
+                </div>
             </div>
         </div>
 
@@ -671,8 +730,6 @@ const ListPage = () => {
                 <Filter size={12} /> Filter Tanggal
             </div>
             <div className="flex gap-2">
-                
-                {/* INPUT TANGGAL MULAI */}
                 <div className="flex-1 relative">
                     <input 
                         type="date" 
@@ -682,10 +739,7 @@ const ListPage = () => {
                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                
                 <span className="self-center text-gray-400">-</span>
-                
-                {/* INPUT TANGGAL AKHIR */}
                 <div className="flex-1 relative">
                     <input 
                         type="date" 
@@ -695,7 +749,6 @@ const ListPage = () => {
                         className="w-full text-xs p-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-
                 {isFilterActive && (
                     <button 
                         onClick={handleResetFilter}
@@ -710,8 +763,6 @@ const ListPage = () => {
       </div>
 
       <div className="p-4 max-w-md mx-auto mt-2">
-        
-        {/* Header List & Tombol Hapus */}
         <div className="flex justify-between items-end mb-3">
             <h3 className="font-bold text-gray-700 text-lg">
                 {isFilterActive ? 'Hasil Filter' : 'Semua Barang'}
@@ -726,7 +777,6 @@ const ListPage = () => {
             )}
         </div>
 
-        {/* List Content */}
         {filteredList.length === 0 ? (
           <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-white mt-4">
             <AlertCircle size={48} className="mx-auto text-gray-300 mb-3" />
@@ -745,11 +795,8 @@ const ListPage = () => {
           <div className="space-y-3">
             {filteredList.map((item, index) => (
               <div key={`${item.id}-${index}`} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex justify-between items-start hover:shadow-md transition">
-                
-                {/* Detail Barang */}
                 <div className="flex-1 pr-2">
                   <div className="font-bold text-gray-800 text-base mb-1.5 leading-tight">{item.item_name}</div>
-                  
                   <div className="grid grid-cols-1 gap-1 text-sm text-gray-600 bg-gray-50 p-2 rounded-md border border-gray-100">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="bg-white border px-1.5 rounded font-mono text-xs text-gray-500 font-bold tracking-wide">
@@ -759,7 +806,6 @@ const ListPage = () => {
                         <Tag size={10} /> {item.category || 'NO-CAT'}
                       </span>
                     </div>
-
                     <div className="flex flex-wrap gap-2 mt-1">
                         {item.brand_name && item.brand_name !== '-' && (
                             <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 rounded border border-purple-100">
@@ -772,13 +818,11 @@ const ListPage = () => {
                             </span>
                         )}
                     </div>
-                    
                     <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1 border-t border-gray-100 pt-1">
                         <Clock size={10} />
                         {item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-'}
                     </div>
                   </div>
-
                   <div className="mt-2 flex items-baseline gap-3">
                       <div>
                           <span className="text-[10px] text-gray-400 font-semibold block leading-none">Normal</span>
@@ -796,7 +840,6 @@ const ListPage = () => {
                       )}
                   </div>
                 </div>
-
                 <button 
                   onClick={() => triggerDeleteItem(item.id, item.item_name)} 
                   className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition mt-1"
@@ -809,7 +852,6 @@ const ListPage = () => {
         )}
       </div>
 
-      {/* Floating Download Button */}
       {filteredList.length > 0 && (
         <div className="fixed bottom-20 left-0 right-0 px-4 z-20 pointer-events-none">
             <div className="max-w-md mx-auto pointer-events-auto">
@@ -824,7 +866,6 @@ const ListPage = () => {
         </div>
       )}
 
-      {/* MODALS */}
       <ConfirmationModal 
         isOpen={modalConfig.isOpen}
         onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
