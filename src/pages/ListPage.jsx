@@ -658,7 +658,7 @@ const ListPage = () => {
       const basicPriceVal = hasWholesale ? '' : price;
 
       let rowArray = [
-        '""', category, sku, name, '""', '""', '""', '""', '""', '""', '""', '""',
+        '""', category, sku, name, '"No"', '"No"', '"0"', '""', '""', '""', '""', '""',
         brand, variant, basicPriceVal,
         '""','""','""','""','""','""','""','""','""','""','""','""'
       ];
@@ -668,7 +668,8 @@ const ListPage = () => {
           rowArray.push(wholesale);
       }
 
-      rowArray.push('""', '""', '""', '""', '""', '""');
+    //   rowArray.push('""', '""', '""', '""', '""', '""');
+      rowArray.push('"0"', '"No"', '"No"', '"0"', '"No"', '""');
 
       return rowArray.join(",");
     });
