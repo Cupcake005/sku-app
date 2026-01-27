@@ -651,8 +651,8 @@ const ListPage = () => {
       const brand = `"${item.brand_name || ''}"`; 
       const variant = `"${item.variant_name || ''}"`;
       
-      const price = item.price || 0;
-      const wholesale = item.wholesale_price || 0;
+      const price = item.price || '';
+      const wholesale = item.wholesale_price || '';
 
       // Jika ada grosir, Basic Price kosong. Jika tidak, Basic Price isi harga.
       const basicPriceVal = hasWholesale ? '' : price;
