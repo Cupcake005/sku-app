@@ -861,7 +861,7 @@ const ListPage = () => {
                     className="w-full bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-xl hover:bg-green-700 flex justify-center items-center gap-2 active:scale-95 transition border-2 border-white/20"
                 >
                     <FileDown size={20} />
-                    {isFilterActive ? 'Download (Filtered)' : 'Download Semua CSV'}
+                    {isFilterActive ? 'Download Filter Data' : 'Download Semua Data'}
                 </button>
             </div>
         </div>
