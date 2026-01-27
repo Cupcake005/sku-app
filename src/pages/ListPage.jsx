@@ -576,11 +576,11 @@ const ListPage = () => {
     setModalConfig({
         isOpen: true,
         type: 'DELETE_ALL',
-        title: 'Hapus Data Tampil?',
+        title: 'Mao hapus semua data Produk kah Bro?',
         message: isFilterActive 
             ? 'PERINGATAN: Aksi ini akan menghapus SEMUA data yang sesuai dengan filter tanggal saat ini.' 
-            : 'Tindakan ini akan mengosongkan seluruh list export Anda.',
-        confirmLabel: 'Hapus Semua',
+            : 'Benaran kosong ni list ekspor!.',
+        confirmLabel: 'Gass lah',
         isDanger: true
     });
   };
@@ -591,9 +591,9 @@ const ListPage = () => {
         type: 'DELETE_ONE',
         id: id,
         name: name,
-        title: 'Hapus Barang?',
-        message: `Apakah Anda yakin ingin menghapus "${name}" dari list?`,
-        confirmLabel: 'Ya, Hapus',
+        title: 'Hapus Kah?',
+        message: `Yakin mau hapus "${name}" dari list?`,
+        confirmLabel: 'Gass',
         isDanger: true
     });
   };
