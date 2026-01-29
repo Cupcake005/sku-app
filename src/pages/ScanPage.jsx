@@ -840,7 +840,7 @@ const ScanPage = () => {
       {/* Header Search */}
       <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-0 z-40">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Scan Barang</h2>
-        <form onSubmit={handleSearch} className="relative mb-2">
+        <form onSubmit={handleSearch} className="relative mb-4">
           <input 
             type="text"
             value={searchQuery}
@@ -848,7 +848,7 @@ const ScanPage = () => {
             placeholder="Cari Nama / SKU..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          <Search className="absolute left-3 top-3.5 text-black" size={20} />
+          <Search className="absolute left-3 top-3.5 text-black z-10" size={20} />
           
           {/* TOMBOL PASTE / CLEAR */}
           {searchQuery ? (
