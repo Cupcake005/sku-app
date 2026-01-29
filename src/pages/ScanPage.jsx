@@ -848,7 +848,7 @@ const ScanPage = () => {
             placeholder="Cari Nama / SKU..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
+          <Search className="absolute left-3 top-3.5 text-black-400" size={20} />
           
           {/* TOMBOL PASTE / CLEAR */}
           {searchQuery ? (
