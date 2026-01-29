@@ -905,6 +905,7 @@ const ScanPage = () => {
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
+                                {item.brand_name && <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.brand_name}</span>}
                                 {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
                               </div>
                             </div>
