@@ -854,10 +854,12 @@ const ScanPage = () => {
           {searchQuery ? (
              <button type="button" onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
                 <X size={16} />
+                <Search className="absolute left-3 top-3.5 text-black z-10" size={20} />
              </button>
           ) : (
              <button type="button" onClick={handlePaste} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition" title="Tempel dari Clipboard">
                 <Clipboard size={16} />
+                 <Search className="absolute left-3 top-3.5 text-black z-10" size={20} />
              </button>
           )}
 
