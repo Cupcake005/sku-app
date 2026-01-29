@@ -848,7 +848,7 @@ const ScanPage = () => {
             placeholder="Cari Nama / SKU..."
             className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          {/* <Search className="absolute left-3 top-3.5 text-black z-10" size={20} /> */}
+          <Search className="absolute left-3 top-3.5 text-black z-10" size={20} />
           
           {/* TOMBOL PASTE / CLEAR */}
           {searchQuery ? (
@@ -863,7 +863,6 @@ const ScanPage = () => {
 
           {/* TOMBOL SCANNER */}
           {/* (Dihapus karena sudah ada di search bar di kode sebelumnya? Sesuaikan jika perlu) */}
-          <button type="submit" className="bg-blue-600 text-white p-1.5 rounded-md"><Search size={16}/></button>
         </form>
       </div>
 
