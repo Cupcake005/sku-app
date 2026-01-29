@@ -524,7 +524,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useExportList } from '../ExportContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight, Copy, Check, Clipboard, ScanLine } from 'lucide-react';
+import { Search, Plus, X, Camera, CameraOff, Zap, ZapOff, ArrowRight, Copy, Check, Clipboard } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
 
 // KOMPONEN:
@@ -556,7 +556,6 @@ const ScanPage = () => {
 
   // Scanner State
   const previousCameraState = useRef(false);
-  const [showScanner, setShowScanner] = useState(false); // State untuk tampilan kamera
 
   const [isCameraActive, setIsCameraActive] = useState(() => {
     return localStorage.getItem('camera_active') === 'false' ? false : true;
@@ -717,13 +716,11 @@ const ScanPage = () => {
       }
   };
 
-  // --- HANDLE SCAN ---
   const handleScan = useCallback(async (sku) => {
     triggerBeep(); 
     setIsFlashOn(false); 
     setSearchQuery(sku);
     await executeSearch(sku);
-    setShowScanner(false); // Tutup scanner layar jika berhasil scan
   }, [triggerBeep, executeSearch]); 
 
   const handleSearch = async (e) => {
@@ -843,57 +840,29 @@ const ScanPage = () => {
       {/* Header Search */}
       <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-0 z-40">
         <h2 className="text-xl font-bold text-center mb-4 text-blue-600">Scan Barang</h2>
-        
-        {/* --- SCANNER KAMERA COMPONENT (Kondisional) --- */}
-        {showScanner && (
-            <div className="mb-4 animate-fade-in border p-2 rounded bg-gray-50">
-                <div className="relative bg-black rounded-lg overflow-hidden h-56 w-full max-w-xs mx-auto flex items-center justify-center shadow-lg">
-                    <Scanner onScanResult={handleScan} flashOn={isFlashOn} />
-                </div>
-                <div className="flex gap-2 mt-2">
-                    <button onClick={() => setIsFlashOn(!isFlashOn)} className={`flex-1 py-2 rounded font-bold text-sm flex items-center justify-center gap-2 ${isFlashOn ? 'bg-yellow-400 text-black' : 'bg-white border text-gray-700'}`}>
-                        {isFlashOn ? <><ZapOff size={16}/> Flash Off</> : <><Zap size={16}/> Flash On</>}
-                    </button>
-                    <button onClick={() => setShowScanner(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded font-bold text-sm">Tutup</button>
-                </div>
-            </div>
-        )}
-
         <form onSubmit={handleSearch} className="relative mb-4">
-          {/* SEARCH ICON */}
-          <Search className="absolute left-3 top-3.5 text-gray-400 z-10" size={20} />
-          
-          {/* INPUT FIELD */}
           <input 
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari Nama / SKU..."
-            className="w-full pl-10 pr-20 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" // pr-20 untuk 2 tombol
+            className="w-full pl-10 pr-12 py-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
+          <Search className="absolute left-3 top-3.5 text-black z-10" size={20} />
           
-          <div className="absolute right-2 top-2 flex items-center gap-1">
-              {/* TOMBOL PASTE / CLEAR */}
-              {searchQuery ? (
-                 <button type="button" onClick={clearSearch} className="bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
-                    <X size={18} />
-                 </button>
-              ) : (
-                 <button type="button" onClick={handlePaste} className="bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition" title="Tempel">
-                    <Clipboard size={18} />
-                 </button>
-              )}
+          {/* TOMBOL PASTE / CLEAR */}
+          {searchQuery ? (
+             <button type="button" onClick={clearSearch} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-gray-200 transition">
+                <X size={16} />
+             </button>
+          ) : (
+             <button type="button" onClick={handlePaste} className="absolute right-12 top-2 bg-gray-100 p-1.5 rounded-full text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition" title="Tempel dari Clipboard">
+                <Clipboard size={16} />
+             </button>
+          )}
 
-              {/* TOMBOL BUKA SCANNER (OPSIONAL) */}
-              <button 
-                type="button" 
-                onClick={() => setShowScanner(!showScanner)} 
-                className="bg-blue-100 p-1.5 rounded-md text-blue-600 hover:bg-blue-200 transition"
-                title="Buka Kamera"
-              >
-                <ScanLine size={20} />
-              </button>
-          </div>
+          {/* TOMBOL SCANNER */}
+          {/* (Dihapus karena sudah ada di search bar di kode sebelumnya? Sesuaikan jika perlu) */}
         </form>
       </div>
 
@@ -910,7 +879,7 @@ const ScanPage = () => {
              ) : (
                  <div className="space-y-3 pb-20">
                     {searchResults.map((item) => {
-                        // --- CEK DUPLIKAT ---
+                        // --- 1. CEK APAKAH SKU SUDAH ADA DI EXPORT LIST ---
                         const isAlreadyInList = exportList.some(exported => 
                             exported.sku && exported.sku !== '-' && exported.sku === item.sku
                         );
@@ -927,26 +896,38 @@ const ScanPage = () => {
                               <div className="font-bold text-gray-800">{item.item_name}</div>
                               <div className="flex items-center gap-2 mb-1">
                                 <div className="text-xs text-gray-500 font-mono bg-gray-100 px-1 rounded">{item.sku}</div>
-                                <button onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }} className="text-gray-400 hover:text-blue-600 transition p-1">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleCopySku(item.sku); }}
+                                    className="text-gray-400 hover:text-blue-600 transition p-1"
+                                >
                                     {copiedSku === item.sku ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                                 </button>
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {item.category && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.category}</span>}
-                                {item.brand_name && item.brand_name !== '-' && (
-                                    <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded border border-purple-100 font-medium">{item.brand_name}</span>
-                                )}
+                                {item.brand_name && <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-blue-100 font-medium">{item.brand_name}</span>}
                                 {item.variant_name && <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 font-medium">{item.variant_name}</span>}
                               </div>
                             </div>
                             
-                            {/* TOMBOL AKSI */}
+                            {/* --- 2. TOMBOL BERUBAH (HIJAU JIKA ADA, ORANGE JIKA BELUM) --- */}
                             {isAlreadyInList ? (
-                                <button onClick={(e) => e.stopPropagation()} className="ml-3 bg-green-100 text-green-600 p-2 rounded-full cursor-default border border-green-200" title="Sudah Masuk List">
+                                <button 
+                                    onClick={(e) => e.stopPropagation()} // Stop klik biar gak nambah lagi
+                                    className="ml-3 bg-green-100 text-green-600 p-2 rounded-full cursor-default border border-green-200"
+                                    title="Sudah Masuk List"
+                                >
                                     <Check size={20} />
                                 </button>
                             ) : (
-                                <button onClick={(e) => { e.stopPropagation(); handleAddItem(item); }} className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200" title="Quick Add">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation(); 
+                                        handleAddItem(item); 
+                                    }} 
+                                    className="ml-3 bg-orange-100 text-orange-600 p-2 rounded-full hover:bg-orange-200"
+                                    title="Quick Add"
+                                >
                                     <Plus size={20} />
                                 </button>
                             )}
@@ -957,7 +938,13 @@ const ScanPage = () => {
                     {searchResults.length === 0 && !loading && (
                         <div className="text-center py-10">
                             <p className="text-gray-400">Produk tidak ditemukan.</p>
-                            <button onClick={() => { setPendingSku(searchQuery); setShowAddModal(true); }} className="mt-4 text-blue-600 font-bold text-sm hover:underline">
+                            <button 
+                                onClick={() => {
+                                    setPendingSku(searchQuery); 
+                                    setShowAddModal(true);
+                                }}
+                                className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                            >
                                 + Tambah Produk Baru "{searchQuery}"
                             </button>
                         </div>
@@ -967,7 +954,7 @@ const ScanPage = () => {
           </div>
         ) : (
           <>
-            {/* Tampilan Scanner Besar di Home */}
+            {/* Tampilan Scanner */}
             <div className="relative bg-black rounded-lg overflow-hidden h-56 w-full max-w-xs mx-auto flex items-center justify-center shadow-lg transition-all">
                 {isCameraActive ? (
                     <Scanner onScanResult={handleScan} flashOn={isFlashOn} />
@@ -980,10 +967,24 @@ const ScanPage = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4 max-w-xs mx-auto">
-                <button onClick={() => { setIsCameraActive(!isCameraActive); if(!isCameraActive) unlockAudioContext(); }} className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${isCameraActive ? 'bg-gray-800' : 'bg-green-600'}`}>
+                <button 
+                    onClick={() => {
+                        setIsCameraActive(!isCameraActive);
+                        if(!isCameraActive) unlockAudioContext(); 
+                    }}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${
+                        isCameraActive ? 'bg-gray-800' : 'bg-green-600'
+                    }`}
+                >
                     {isCameraActive ? <><CameraOff size={18}/> Matikan</> : <><Camera size={18}/> Hidupkan</>}</button>
 
-                <button onClick={() => setIsFlashOn(!isFlashOn)} disabled={!isCameraActive} className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold shadow transition text-sm ${!isCameraActive ? 'bg-gray-300 text-gray-400' : isFlashOn ? 'bg-yellow-400 text-black' : 'bg-white text-gray-800 border'}`}>
+                <button 
+                    onClick={() => setIsFlashOn(!isFlashOn)}
+                    disabled={!isCameraActive}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold shadow transition text-sm ${
+                        !isCameraActive ? 'bg-gray-300 text-gray-400' : isFlashOn ? 'bg-yellow-400 text-black' : 'bg-white text-gray-800 border'
+                    }`}
+                >
                     {isFlashOn ? <><ZapOff size={18}/> Flash Off</> : <><Zap size={18}/> Flash On</>}</button>
             </div>
           </>
@@ -992,24 +993,71 @@ const ScanPage = () => {
 
       {!isSearching && exportList.length > 0 && (
           <div className="fixed bottom-20 left-4 right-4 z-20">
-              <button onClick={() => navigate('/list')} className="w-full bg-blue-600 text-white p-4 rounded-xl shadow-xl flex justify-between items-center hover:bg-blue-700 transition transform hover:-translate-y-1">
+              <button 
+                onClick={() => navigate('/list')} 
+                className="w-full bg-blue-600 text-white p-4 rounded-xl shadow-xl flex justify-between items-center hover:bg-blue-700 transition transform hover:-translate-y-1"
+              >
                   <div className="flex items-center gap-3">
-                      <div className="bg-white text-blue-600 font-bold w-8 h-8 rounded-full flex items-center justify-center">{exportList.length}</div>
-                      <div className="text-left"><p className="font-bold text-sm">Barang Disimpan</p><p className="text-xs text-blue-200">Ketuk untuk lihat detail & export</p></div>
+                      <div className="bg-white text-blue-600 font-bold w-8 h-8 rounded-full flex items-center justify-center">
+                          {exportList.length}
+                      </div>
+                      <div className="text-left">
+                          <p className="font-bold text-sm">Barang Disimpan</p>
+                          <p className="text-xs text-blue-200">Ketuk untuk lihat detail & export</p>
+                      </div>
                   </div>
                   <ArrowRight size={20} />
               </button>
           </div>
       )}
 
-      {/* --- MODALS --- */}
-      <ConfirmationModal isOpen={showConfirmModal} onClose={() => { setShowConfirmModal(false); setPendingUpdateProduct(null); setExistingProductData(null); }} onConfirm={executeUpdate} title="Update Harga?" message={`Produk "${pendingUpdateProduct?.item_name}" sudah ada di list, tapi harganya berbeda.`} confirmLabel="Ya, Update" isDanger={false} 
-        details={ existingProductData && pendingUpdateProduct ? ( <div className="grid grid-cols-2 gap-4 text-center"><div className="bg-white p-2 rounded border"><p className="text-xs text-gray-400 mb-1">Harga Lama</p><p className="font-bold text-gray-600">Rp {existingProductData.price.toLocaleString()}</p></div><div className="bg-blue-50 p-2 rounded border border-blue-200"><p className="text-xs text-blue-400 mb-1">Harga Baru</p><p className="font-bold text-blue-600">Rp {pendingUpdateProduct.price.toLocaleString()}</p></div></div> ) : null } 
+      {/* --- RENDER MODAL KONFIRMASI --- */}
+      <ConfirmationModal 
+        isOpen={showConfirmModal}
+        onClose={() => {
+            setShowConfirmModal(false);
+            setPendingUpdateProduct(null);
+            setExistingProductData(null);
+        }}
+        onConfirm={executeUpdate}
+        title="Update Harga?"
+        message={`Produk "${pendingUpdateProduct?.item_name}" sudah ada di list, tapi harganya berbeda.`}
+        confirmLabel="Ya, Update" 
+        isDanger={false}
+        details={
+            existingProductData && pendingUpdateProduct ? (
+                <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="bg-white p-2 rounded border">
+                        <p className="text-xs text-gray-400 mb-1">Harga Lama</p>
+                        <p className="font-bold text-gray-600">Rp {existingProductData.price.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                        <p className="text-xs text-blue-400 mb-1">Harga Baru</p>
+                        <p className="font-bold text-blue-600">Rp {pendingUpdateProduct.price.toLocaleString()}</p>
+                    </div>
+                </div>
+            ) : null
+        }
       />
 
-      <ProductModal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} product={productFormDefault || { sku: pendingSku }} onSave={handleSaveProduct} allProducts={allProducts} setIsScannerActive={setIsCameraActive} />
+      <ProductModal 
+        isOpen={showAddModal}
+        onClose={() => { setShowAddModal(false); setProductFormDefault(null); }} 
+        product={productFormDefault || { sku: pendingSku }} 
+        onSave={handleSaveProduct}
+        allProducts={allProducts} 
+        setIsScannerActive={setIsCameraActive} 
+      />
 
-      <ProductResultModal isOpen={!!productData} onClose={() => setProductData(null)} product={productData} onAddToExport={handleAddItem} allProducts={allProducts} setIsScannerActive={setIsCameraActive} onEditMaster={handleEditMaster} />
+      <ProductResultModal 
+        isOpen={!!productData} 
+        onClose={() => setProductData(null)}
+        product={productData}
+        onAddToExport={handleAddItem}
+        allProducts={allProducts} 
+        setIsScannerActive={setIsCameraActive} 
+        onEditMaster={handleEditMaster} 
+      />
 
     </div>
   );
