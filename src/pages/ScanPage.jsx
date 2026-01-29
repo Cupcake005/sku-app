@@ -1,7 +1,5 @@
 
-
-//=================================================================================
-
+// //=====================================================================
 // import React, { useState, useEffect, useCallback, useRef } from 'react';
 // import { supabase } from '../supabaseClient';
 // import { useExportList } from '../ExportContext';
@@ -37,7 +35,6 @@
 //   const [notifyModal, setNotifyModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
 //   // Scanner State
-//   // Simpan status kamera sebelumnya untuk dipulihkan nanti
 //   const previousCameraState = useRef(false);
 
 //   const [isCameraActive, setIsCameraActive] = useState(() => {
@@ -46,58 +43,51 @@
 //   const [isFlashOn, setIsFlashOn] = useState(false);
 
 //   // --- LOGIKA OTOMATIS MATIKAN KAMERA ---
-//   const [isSearching, setIsSearching] = useState(false); // Naikkan scope isSearching ke atas
+//   const [isSearching, setIsSearching] = useState(false); 
 
 //   useEffect(() => {
-//     // Kondisi di mana kamera harus MATI SEMENTARA
+//     // Kondisi di mana kamera & flash harus MATI
 //     const shouldPauseCamera = showAddModal || !!productData || isSearching || showConfirmModal;
 
 //     if (shouldPauseCamera) {
+//         if (isFlashOn) setIsFlashOn(false); // Matikan flash paksa
+
 //         if (isCameraActive) {
-//             previousCameraState.current = true; // Ingat bahwa tadi kamera nyala
-//             setIsCameraActive(false);           // Matikan sekarang
-//             setIsFlashOn(false);                // Matikan flash juga
+//             previousCameraState.current = true; // Simpan state
+//             setIsCameraActive(false);           // Matikan kamera
 //         }
 //     } else {
-//         // Jika semua modal tutup, pulihkan status kamera
+//         // Jika semua modal tutup dan search selesai, pulihkan kamera
 //         if (previousCameraState.current) {
 //             setIsCameraActive(true);
-//             previousCameraState.current = false; // Reset memori
+//             previousCameraState.current = false; 
 //         }
 //     }
-//   }, [showAddModal, productData, isSearching, showConfirmModal]); // Dependensi pemicu
+//   }, [showAddModal, productData, isSearching, showConfirmModal]); 
 
-//   // Simpan preferensi User ke localStorage (Hanya jika bukan karena pause otomatis)
 //   useEffect(() => {
 //     if (!showAddModal && !productData && !isSearching && !showConfirmModal) {
 //         localStorage.setItem('camera_active', isCameraActive);
 //     }
 //   }, [isCameraActive]);
 
-//   // --- AUDIO BEEP RINGAN (WEB AUDIO API) ---
+//   // --- AUDIO BEEP ---
 //   const triggerBeep = useCallback(() => {
 //     try {
 //         const AudioContext = window.AudioContext || window.webkitAudioContext;
 //         if (!AudioContext) return; 
-
 //         const ctx = new AudioContext();
 //         const osc = ctx.createOscillator();
 //         const gain = ctx.createGain();
-
 //         osc.connect(gain);
 //         gain.connect(ctx.destination);
-
 //         osc.type = 'square'; 
 //         osc.frequency.setValueAtTime(1500, ctx.currentTime); 
 //         gain.gain.setValueAtTime(0.1, ctx.currentTime); 
-
 //         osc.start();
 //         osc.stop(ctx.currentTime + 0.1); 
-        
 //         setTimeout(() => ctx.close(), 150);
-//     } catch (e) {
-//         console.error("Audio error:", e);
-//     }
+//     } catch (e) { console.error("Audio error:", e); }
 //   }, []);
 
 //   const unlockAudioContext = () => {
@@ -114,21 +104,16 @@
 
 //   const closeNotify = () => setNotifyModal({ ...notifyModal, isOpen: false });
 
-//   // --- FETCH DATA SEKALI SAJA ---
+//   // --- FETCH DATA ---
 //   useEffect(() => {
 //     const fetchAllProducts = async () => {
 //       try {
 //         const { data, error } = await supabase.from('products').select('*');
 //         if (error) throw error;
 //         if (data) setAllProducts(data);
-//       } catch (error) {
-//         console.error("Error fetching data:", error.message);
-//       }
+//       } catch (error) { console.error("Error fetching data:", error.message); }
 //     };
-
-//     if (user) {
-//         fetchAllProducts();
-//     }
+//     if (user) fetchAllProducts();
 //   }, [user]);
 
 //   // --- SEARCH ---
@@ -143,9 +128,8 @@
 //           setIsSearching(false);
 //           return;
 //       }
-
 //       setLoading(true);
-//       setIsSearching(true); // Ini akan memicu useEffect kamera mati
+//       setIsSearching(true); 
 
 //       try {
 //         const { data, error } = await supabase
@@ -163,7 +147,6 @@
 //             if (!aExact && bExact) return 1;
 //             return 0;
 //         });
-
 //         setSearchResults(sortedData);
 //       } catch (error) {
 //         console.error("Search Error:", error.message);
@@ -181,6 +164,7 @@
 //     } catch (err) { console.error('Copy Error:', err); }
 //   };
 
+//   // --- 1. PERUBAHAN DISINI (Agar tidak langsung balik ke kamera) ---
 //   const handleAddItem = (product) => {
 //     const existingItem = exportList.find((item) => item.sku === product.sku);
     
@@ -194,30 +178,33 @@
 //           setPendingUpdateProduct(product);     
 //           setShowConfirmModal(true);            
 //       } else {
-//           showNotify('info', 'Produk Duplikat', `Produk "${product.item_name}" sudah ada di list dengan harga yang sama!`);
+//           showNotify('info', 'Produk Duplikat', `Produk "${product.item_name}" sudah ada di list!`);
 //       }
 //       return; 
 //     }
     
 //     addToExportList(product);
-//     setProductData(null); 
-//     clearSearch(); // Ini akan memicu kamera hidup lagi
+//     showNotify('success', 'Tersimpan', `${product.item_name} berhasil ditambahkan.`);
+    
+//     setProductData(null); // Tutup modal detail jika terbuka
+//     // clearSearch(); <--- BARIS INI DIHAPUS agar list pencarian tetap ada
 //   };
 
 //   const executeUpdate = () => {
 //       if (pendingUpdateProduct) {
 //           updateExportItem(pendingUpdateProduct);
-//           showNotify('success', 'Berhasil Update', 'Harga produk dalam list berhasil diperbarui!');
+//           showNotify('success', 'Berhasil Update', 'Harga produk diperbarui!');
 //           setShowConfirmModal(false);
 //           setPendingUpdateProduct(null);
 //           setExistingProductData(null);
 //           setProductData(null); 
-//           clearSearch();
+//           // clearSearch(); // Opsional: Mau ditutup atau tidak setelah update? Saya biarkan tutup biar fresh
 //       }
 //   };
 
 //   const handleScan = async (sku) => {
 //     triggerBeep(); 
+//     setIsFlashOn(false); // Matikan flash
 //     setSearchQuery(sku);
 //     await executeSearch(sku);
 //   };
@@ -230,7 +217,7 @@
 //   const clearSearch = () => { 
 //       setSearchQuery(''); 
 //       setSearchResults([]); 
-//       setIsSearching(false); // Kamera akan hidup lagi di sini
+//       setIsSearching(false); // Kamera hidup lagi
 //   };
   
 //   const handleItemClick = (item) => { setProductData(item); };
@@ -241,7 +228,6 @@
     
 //     const isUpdate = !isVariantMode && productFormDefault && productFormDefault.id;
 //     let error, data;
-
 //     const payload = {
 //         sku: formData.sku,
 //         item_name: formData.item_name,
@@ -265,7 +251,7 @@
 //     if (error) {
 //         showNotify('error', 'Gagal Menyimpan', error.message);
 //     } else {
-//         showNotify('success', 'Berhasil', isUpdate ? 'Produk berhasil diperbarui!' : 'Produk baru berhasil ditambahkan!');
+//         showNotify('success', 'Berhasil', isUpdate ? 'Produk diperbarui!' : 'Produk ditambahkan!');
 //         setShowAddModal(false); 
 //         setProductFormDefault(null); 
 
@@ -402,7 +388,7 @@
 //                 <button 
 //                     onClick={() => {
 //                         setIsCameraActive(!isCameraActive);
-//                         if(!isCameraActive) unlockAudioContext(); // PANCING AUDIO SAAT KAMERA HIDUP
+//                         if(!isCameraActive) unlockAudioContext(); 
 //                     }}
 //                     className={`flex items-center justify-center gap-2 py-2 rounded-lg font-bold text-white shadow transition text-sm ${
 //                         isCameraActive ? 'bg-gray-800' : 'bg-green-600'
@@ -454,7 +440,7 @@
 //         onConfirm={executeUpdate}
 //         title="Update Harga?"
 //         message={`Produk "${pendingUpdateProduct?.item_name}" sudah ada di list, tapi harganya berbeda.`}
-//         confirmLabel="Ya, Update" // Pastikan teksnya Update
+//         confirmLabel="Ya, Update" 
 //         isDanger={false}
 //         details={
 //             existingProductData && pendingUpdateProduct ? (
@@ -497,7 +483,9 @@
 
 // export default ScanPage;
 
-//=====================================================================
+
+//======================================================================================================================
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useExportList } from '../ExportContext';
@@ -662,7 +650,6 @@ const ScanPage = () => {
     } catch (err) { console.error('Copy Error:', err); }
   };
 
-  // --- 1. PERUBAHAN DISINI (Agar tidak langsung balik ke kamera) ---
   const handleAddItem = (product) => {
     const existingItem = exportList.find((item) => item.sku === product.sku);
     
@@ -683,9 +670,7 @@ const ScanPage = () => {
     
     addToExportList(product);
     showNotify('success', 'Tersimpan', `${product.item_name} berhasil ditambahkan.`);
-    
-    setProductData(null); // Tutup modal detail jika terbuka
-    // clearSearch(); <--- BARIS INI DIHAPUS agar list pencarian tetap ada
+    setProductData(null); 
   };
 
   const executeUpdate = () => {
@@ -696,16 +681,16 @@ const ScanPage = () => {
           setPendingUpdateProduct(null);
           setExistingProductData(null);
           setProductData(null); 
-          // clearSearch(); // Opsional: Mau ditutup atau tidak setelah update? Saya biarkan tutup biar fresh
       }
   };
 
-  const handleScan = async (sku) => {
+  // --- HANDLE SCAN (Di-wrap useCallback agar stabil untuk listener) ---
+  const handleScan = useCallback(async (sku) => {
     triggerBeep(); 
-    setIsFlashOn(false); // Matikan flash
+    setIsFlashOn(false); 
     setSearchQuery(sku);
     await executeSearch(sku);
-  };
+  }, [triggerBeep, executeSearch]); // Dependency penting
 
   const handleSearch = async (e) => {
       e.preventDefault();
@@ -715,7 +700,7 @@ const ScanPage = () => {
   const clearSearch = () => { 
       setSearchQuery(''); 
       setSearchResults([]); 
-      setIsSearching(false); // Kamera hidup lagi
+      setIsSearching(false); 
   };
   
   const handleItemClick = (item) => { setProductData(item); };
@@ -762,6 +747,7 @@ const ScanPage = () => {
                 if (isUpdate) return prev.map(p => p.id === data.id ? data : p);
                 return [data, ...prev];
             });
+            setProductData(data); 
         }
     }
   };
@@ -771,6 +757,39 @@ const ScanPage = () => {
       setProductFormDefault(productToEdit); 
       setShowAddModal(true); 
   };
+
+  // --- TAMBAHAN FITUR: GLOBAL SCANNER LISTENER (Bluetooth/USB) ---
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleGlobalKeyDown = (e) => {
+        const currentTime = Date.now();
+        
+        // 1. Deteksi Kecepatan Ketik (Scanner fisik sangat cepat, <50ms antar tombol)
+        // Jika gap terlalu lama, reset buffer (karena itu manual typing)
+        if (currentTime - lastKeyTime > 50) {
+            buffer = '';
+        }
+        lastKeyTime = currentTime;
+
+        // 2. Tangkap Karakter
+        if (e.key === 'Enter') {
+            // Jika buffer terisi karakter cepat sebelumnya, berarti itu barcode
+            if (buffer.length > 1) { 
+                e.preventDefault(); // Cegah form submit default (biar gak bentrok)
+                handleScan(buffer); // Jalankan logika scan
+                buffer = '';
+            }
+        } else if (e.key.length === 1) {
+            // Tambahkan huruf/angka ke buffer
+            buffer += e.key;
+        }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [handleScan]);
 
   return (
     <div className="pb-24 max-w-md mx-auto relative min-h-screen"> 

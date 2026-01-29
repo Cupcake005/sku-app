@@ -1,3 +1,4 @@
+
 // import React, { useState, useEffect } from 'react';
 // import { X, Plus, Edit, Tag, DollarSign, Layers, Package } from 'lucide-react';
 
@@ -12,13 +13,21 @@
 //   const [priceWholesale, setPriceWholesale] = useState('');
 //   const [variants, setVariants] = useState([]);
 
+//   // --- PERBAIKAN 1: PISAHKAN LOGIC INIT HARGA ---
+//   // Effect ini HANYA jalan saat modal dibuka atau ID produk berubah.
+//   // Kita HAPUS 'allProducts' dari dependency array di sini agar input tidak reset saat auto-refresh background jalan.
 //   useEffect(() => {
 //     if (product && isOpen) {
-//       setPriceNormal(product.price || 0);
-//       setPriceWholesale(product.wholesale_price || 0);
+//       setPriceNormal(product.price);
+//       setPriceWholesale(product.wholesale_price);
+//     }
+//   }, [isOpen, product?.id]); // Gunakan optional chaining product?.id agar lebih aman
 
-//       // --- LOGIC CARI VARIAN ---
-//       if (allProducts.length > 0) {
+//   // --- PERBAIKAN 2: LOGIC CARI VARIAN (Terpisah) ---
+//   // Effect ini boleh jalan saat allProducts berubah (auto refresh), karena hanya update list varian
+//   // dan TIDAK mengganggu input harga yang sedang diketik.
+//   useEffect(() => {
+//     if (product && isOpen && allProducts.length > 0) {
 //         const targetName = cleanStr(product.item_name);
 //         const targetBrand = cleanStr(product.brand_name || '');
 
@@ -38,19 +47,18 @@
 //             isExisting: true 
 //         }));
 //         setVariants(foundVariants);
-//       } else {
+//     } else {
 //         setVariants([]);
-//       }
 //     }
-//   }, [product, isOpen, allProducts]);
+//   }, [isOpen, product?.id, allProducts]); // Di sini allProducts tetap ada biar varian selalu update
 
 //   if (!isOpen || !product) return null;
 
 //   const handleConfirm = () => {
 //     const modifiedProduct = {
 //         ...product,
-//         price: parseFloat(priceNormal) || 0,           
-//         wholesale_price: parseFloat(priceWholesale) || 0,
+//         price: parseFloat(priceNormal),          
+//         wholesale_price: parseFloat(priceWholesale),
 //     };
 //     onAddToExport(modifiedProduct);
 //   };
@@ -69,13 +77,11 @@
 //                 {product.item_name}
 //             </h2>
             
-//             {/* --- UPDATE: TAMPILKAN SKU & UNIT --- */}
 //             <div className="flex justify-center items-center gap-2 text-gray-500 text-xs mt-1">
 //                 <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200 font-mono">
 //                     {product.sku}
 //                 </span>
                 
-//                 {/* Tampilkan Nama Varian / Unit (Pcs, Pack, dll) */}
 //                 {(product.variant_name || product.unit) && (
 //                     <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold uppercase flex items-center gap-1">
 //                         <Package size={10} />
@@ -88,7 +94,6 @@
 //                 {product.category} {product.brand_name !== '-' && `• ${product.brand_name}`}
 //             </div>
 
-//             {/* --- TOMBOL EDIT MASTER DATA --- */}
 //             <button 
 //                 onClick={() => onEditMaster(product)}
 //                 className="mt-3 text-xs bg-orange-50 text-orange-600 border border-orange-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 mx-auto hover:bg-orange-100 transition"
@@ -107,7 +112,7 @@
 //                     <input 
 //                         type="number" 
 //                         className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-blue-700 placeholder-blue-300"
-//                         value={priceNormal === 0 ? '' : priceNormal} // Kosong jika 0
+//                         value={priceNormal} 
 //                         onChange={(e) => setPriceNormal(e.target.value)} 
 //                         placeholder="0"
 //                     />
@@ -122,7 +127,7 @@
 //                     <input 
 //                         type="number" 
 //                         className="w-full pl-5 pr-1 py-1 text-lg font-bold bg-transparent outline-none text-green-700 placeholder-green-300"
-//                         value={priceWholesale === 0 ? '' : priceWholesale} // Kosong jika 0
+//                         value={priceWholesale}
 //                         onChange={(e) => setPriceWholesale(e.target.value)} 
 //                         placeholder="0"
 //                     />
@@ -157,7 +162,7 @@
 //             </div>
 //         )}
 
-//         <button onClick={handleConfirm} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
+//         <button onClick={handleConfirm} className="w-full bg-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
 //             <Plus size={20} /> Masukkan Ke List
 //         </button>
 
@@ -168,9 +173,11 @@
 
 // export default ProductResultModal;
 
+//===================================================================================
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Edit, Tag, DollarSign, Layers, Package } from 'lucide-react';
+import { X, Plus, Edit, Tag, DollarSign, Layers, Package, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useExportList } from '../ExportContext'; // Import Context Export
 
 // Helper: Bersihkan string
 const cleanStr = (str) => {
@@ -179,23 +186,33 @@ const cleanStr = (str) => {
 };
 
 const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProducts = [], onEditMaster }) => {
+  const { exportList } = useExportList(); // Ambil list export
+  
   const [priceNormal, setPriceNormal] = useState('');
   const [priceWholesale, setPriceWholesale] = useState('');
   const [variants, setVariants] = useState([]);
+  const [isAlreadyExported, setIsAlreadyExported] = useState(false); // State status export
 
-  // --- PERBAIKAN 1: PISAHKAN LOGIC INIT HARGA ---
-  // Effect ini HANYA jalan saat modal dibuka atau ID produk berubah.
-  // Kita HAPUS 'allProducts' dari dependency array di sini agar input tidak reset saat auto-refresh background jalan.
+  // --- LOGIC CEK STATUS EXPORT ---
+  useEffect(() => {
+    if (product && isOpen) {
+      // Cek apakah SKU produk ini ada di exportList
+      const foundInExport = exportList.some(item => 
+          item.sku && item.sku !== '-' && item.sku === product.sku
+      );
+      setIsAlreadyExported(foundInExport);
+    }
+  }, [isOpen, product, exportList]); // Dependency exportList agar real-time
+
+  // --- INIT HARGA ---
   useEffect(() => {
     if (product && isOpen) {
       setPriceNormal(product.price);
       setPriceWholesale(product.wholesale_price);
     }
-  }, [isOpen, product?.id]); // Gunakan optional chaining product?.id agar lebih aman
+  }, [isOpen, product?.id]); 
 
-  // --- PERBAIKAN 2: LOGIC CARI VARIAN (Terpisah) ---
-  // Effect ini boleh jalan saat allProducts berubah (auto refresh), karena hanya update list varian
-  // dan TIDAK mengganggu input harga yang sedang diketik.
+  // --- LOGIC CARI VARIAN ---
   useEffect(() => {
     if (product && isOpen && allProducts.length > 0) {
         const targetName = cleanStr(product.item_name);
@@ -220,7 +237,7 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
     } else {
         setVariants([]);
     }
-  }, [isOpen, product?.id, allProducts]); // Di sini allProducts tetap ada biar varian selalu update
+  }, [isOpen, product?.id, allProducts]); 
 
   if (!isOpen || !product) return null;
 
@@ -240,9 +257,19 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
         <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full z-10"><X size={24} /></button>
 
         <div className="text-center mb-6">
-            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full mb-3 inline-block text-xs font-bold shadow-sm uppercase tracking-wider">
-                ✓ Produk Ditemukan
+            {/* --- INDIKATOR STATUS --- */}
+            <div className={`px-3 py-1 rounded-full mb-3 inline-flex items-center gap-1 text-xs font-bold shadow-sm uppercase tracking-wider ${
+                isAlreadyExported 
+                ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
+                : 'bg-green-100 text-green-800 border border-green-200'
+            }`}>
+                {isAlreadyExported ? (
+                    <><AlertTriangle size={12} /> Produk Sudah Ada di List Export</>
+                ) : (
+                    <><CheckCircle size={12} /> Produk Ditemukan</>
+                )}
             </div>
+
             <h2 className="text-xl font-bold text-gray-800 leading-tight mb-1">
                 {product.item_name}
             </h2>
@@ -332,8 +359,15 @@ const ProductResultModal = ({ isOpen, onClose, product, onAddToExport, allProduc
             </div>
         )}
 
-        <button onClick={handleConfirm} className="w-full bg-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-blue-700 flex justify-center items-center gap-2">
-            <Plus size={20} /> Masukkan Ke List
+        <button 
+            onClick={handleConfirm} 
+            className={`w-full font-bold py-3.5 rounded-xl shadow-lg flex justify-center items-center gap-2 text-white transition ${
+                isAlreadyExported 
+                ? 'bg-yellow-600 hover:bg-yellow-700' 
+                : 'bg-orange-500 hover:bg-orange-600'
+            }`}
+        >
+            <Plus size={20} /> {isAlreadyExported ? 'Update Data di List' : 'Masukkan Ke List'}
         </button>
 
       </div>
