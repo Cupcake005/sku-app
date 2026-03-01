@@ -211,7 +211,7 @@ const ListPage = () => {
         "Internal ID Variant (Do Not Edit)", "Category", "SKU", "Items Name (Do Not Edit)", 
         "ecommerce item? (Yes/No)", "Pre-order ? (Yes/No)", "Processing days", 
         "Weight (gm)", "Length (cm)", "Width (cm)", "Height (cm)", "Condition", 
-        "Brand Name","Gender", "Age group", "Color", "Size", "Material", "Variant name", "Basic - Price", 
+        "Brand Name","Gender", "Age group", "Color", "Size", "Material", "Variant name (Recommended Format: Color/Size/Material) e.g. Red/Medium/Cotton", "Basic - Price", 
         "Image 1 (for Online Store)", "Image 2 (for Online Store)", "Image 3 (for Online Store)", 
         "Image 4 (for Online Store)", "Image 5 (for Online Store)", "Image 6 (for Online Store)", 
         "Image 7 (for Online Store)", "Image 8 (for Online Store)", "Image 9 (for Online Store)", 
